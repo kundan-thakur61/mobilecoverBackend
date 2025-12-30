@@ -1,0 +1,13 @@
+[
+  {
+    "productId": "PUT_PRODUCT_ID_HERE",
+    "variantIndex": 0,
+    "images": [
+      {
+        "url": "https://res.cloudinary.com/your-cloud-name/image/upload/v1234567890/sample.jpg",
+        "publicId": "mobile-covers/sample",
+        "isPrimary": true
+      }
+    ]
+  }
+]

@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: copadmob-backend
+    env: node
+    region: singapore
+    plan: free
+    branch: main
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: SHIPROCKET_EMAIL
+        sync: false
+      - key: SHIPROCKET_PASSWORD
+        sync: false
+      - key: SHIPROCKET_API_BASE_URL
+        value: https://apiv2.shiprocket.in/v1/external
+      - key: SHIPROCKET_WEBHOOK_SECRET
+        sync: false
+      - key: SHIPROCKET_AUTO_CREATE
+        value: true
+      - key: FRONTEND_URL
+        value: http://localhost:3000
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://coverghar.in,https://www.coverghar.in
+      - key: LOG_LEVEL
+        value: info
+    healthCheckPath: /api/health
