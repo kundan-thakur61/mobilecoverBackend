@@ -1,6 +1,6 @@
-# Shiprocket Integration - Quick Start Example
+# DeliveryOne Integration - Quick Start Example
 
-This file shows how to integrate Shiprocket automatic shipment creation into your order flow.
+This file shows how to integrate DeliveryOne automatic shipment creation into your order flow.
 
 ## Option 1: Manual Shipment Creation (Admin Dashboard)
 
@@ -13,7 +13,7 @@ To automatically create shipments when orders are paid, add this code to your or
 ### In `controllers/orderController.js`
 
 ```javascript
-const shiprocketHelper = require('../utils/shiprocketHelper');
+const deliveryOneService = require('../services/deliveryOneService');
 
 // In the verifyPayment function, after order is confirmed:
 
@@ -30,9 +30,9 @@ const verifyPayment = async (req, res, next) => {
 
     await order.save();
 
-    // AUTO-CREATE SHIPMENT IN SHIPROCKET (Add this block)
-    if (process.env.SHIPROCKET_AUTO_CREATE === 'true') {
-      shiprocketHelper.autoCreateShipment(order, {
+    // AUTO-CREATE SHIPMENT IN DELIVERYONE (Add this block)
+    if (process.env.DELIVERYONE_AUTO_CREATE === 'true') {
+      deliveryOneService.autoCreateShipment(order, {
         orderType: 'regular',
         pickupLocation: 'Primary',
         autoAssignCourier: true,  // Automatically assign cheapest courier
@@ -53,7 +53,7 @@ const verifyPayment = async (req, res, next) => {
 ### In `controllers/customOrderController.js`
 
 ```javascript
-const shiprocketHelper = require('../utils/shiprocketHelper');
+const deliveryOneService = require('../services/deliveryOneService');
 
 // In the verifyCustomPayment function:
 
@@ -69,8 +69,8 @@ const verifyCustomPayment = async (req, res, next) => {
     await customOrder.save();
 
     // AUTO-CREATE SHIPMENT FOR CUSTOM ORDER (Add this block)
-    if (process.env.SHIPROCKET_AUTO_CREATE === 'true') {
-      shiprocketHelper.autoCreateShipment(customOrder, {
+    if (process.env.DELIVERYONE_AUTO_CREATE === 'true') {
+      deliveryOneService.autoCreateShipment(customOrder, {
         orderType: 'custom',
         pickupLocation: 'Primary',
         autoAssignCourier: true,
@@ -90,8 +90,8 @@ const verifyCustomPayment = async (req, res, next) => {
 ### Add to `.env` file
 
 ```env
-# Enable automatic Shiprocket shipment creation
-SHIPROCKET_AUTO_CREATE=true
+# Enable automatic DeliveryOne shipment creation
+DELIVERYONE_AUTO_CREATE=true
 ```
 
 ## Option 3: Background Job (Recommended for Production)
@@ -101,22 +101,22 @@ For production environments, consider using a background job queue (like Bull or
 ```javascript
 // Example with Bull queue
 const Queue = require('bull');
-const shiprocketQueue = new Queue('shiprocket-shipments', process.env.REDIS_URL);
+const deliveryOneQueue = new Queue('deliveryone-shipments', process.env.REDIS_URL);
 
 // Add job after payment confirmation
-shiprocketQueue.add('create-shipment', {
+deliveryOneQueue.add('create-shipment', {
   orderId: order._id,
   orderType: 'regular'
 });
 
 // Process jobs in a separate worker
-shiprocketQueue.process('create-shipment', async (job) => {
+deliveryOneQueue.process('create-shipment', async (job) => {
   const { orderId, orderType } = job.data;
   const Order = require('../models/Order');
   const order = await Order.findById(orderId);
   
   if (order) {
-    await shiprocketHelper.autoCreateShipment(order, {
+    await deliveryOneService.autoCreateShipment(order, {
       orderType,
       autoAssignCourier: true
     });
@@ -128,9 +128,9 @@ shiprocketQueue.process('create-shipment', async (job) => {
 
 1. Set up environment variables:
 ```bash
-SHIPROCKET_EMAIL=your@email.com
-SHIPROCKET_PASSWORD=yourpassword
-SHIPROCKET_AUTO_CREATE=true
+DELIVERYONE_API_KEY=your-api-key
+DELIVERYONE_SECRET_KEY=your-secret-key
+DELIVERYONE_AUTO_CREATE=true
 ```
 
 2. Create a test order through your application
@@ -139,10 +139,10 @@ SHIPROCKET_AUTO_CREATE=true
 
 4. Check logs:
 ```
-Shiprocket shipment created successfully: { orderId: '...', shipmentId: 12345678, awbCode: 'AWB...' }
+DeliveryOne shipment created successfully: { orderId: '...', shipmentId: 12345678, awbCode: 'AWB...' }
 ```
 
-5. Verify in Shiprocket dashboard that the order appears
+5. Verify in DeliveryOne dashboard that the order appears
 
 ## Monitoring Shipments
 
@@ -152,20 +152,20 @@ Create a cron job to sync tracking information:
 // scripts/syncShipments.js
 const cron = require('node-cron');
 const Order = require('../models/Order');
-const shiprocketHelper = require('../utils/shiprocketHelper');
+const deliveryOneService = require('../services/deliveryOneService');
 
 // Run every hour
 cron.schedule('0 * * * *', async () => {
   console.log('Syncing shipment tracking data...');
   
   const activeOrders = await Order.find({
-    'shiprocket.awbCode': { $exists: true },
+    'deliveryOne.awbCode': { $exists: true },
     status: { $in: ['confirmed', 'processing', 'shipped'] }
   });
 
   for (const order of activeOrders) {
     try {
-      await shiprocketHelper.syncTrackingInfo(order);
+      await deliveryOneService.syncTrackingInfo(order);
       console.log(`Updated tracking for order ${order._id}`);
     } catch (err) {
       console.error(`Failed to sync order ${order._id}:`, err.message);
@@ -180,13 +180,13 @@ cron.schedule('0 * * * *', async () => {
 
 ### Case 1: Manual Review Before Shipping
 ```javascript
-// Don't set SHIPROCKET_AUTO_CREATE
+// Don't set DELIVERYONE_AUTO_CREATE
 // Admin manually creates shipments after reviewing orders
 ```
 
 ### Case 2: Instant Shipping for Small Items
 ```javascript
-// Set SHIPROCKET_AUTO_CREATE=true
+// Set DELIVERYONE_AUTO_CREATE=true
 // Auto-create and assign courier immediately after payment
 autoCreateShipment(order, {
   autoAssignCourier: true,
@@ -200,8 +200,8 @@ autoCreateShipment(order, {
 // Custom orders: Manual review
 
 // In verifyPayment (regular orders)
-if (process.env.SHIPROCKET_AUTO_CREATE === 'true') {
-  shiprocketHelper.autoCreateShipment(order, { ... });
+if (process.env.DELIVERYONE_AUTO_CREATE === 'true') {
+  deliveryOneService.autoCreateShipment(order, { ... });
 }
 
 // In verifyCustomPayment (custom orders)
@@ -214,7 +214,7 @@ const pickupLocation = order.items.some(item => item.category === 'premium')
   ? 'Premium Warehouse'
   : 'Primary';
 
-shiprocketHelper.autoCreateShipment(order, {
+deliveryOneService.autoCreateShipment(order, {
   pickupLocation,
   autoAssignCourier: true
 });
@@ -222,7 +222,7 @@ shiprocketHelper.autoCreateShipment(order, {
 
 ## Webhook Notifications
 
-When Shiprocket updates shipment status, your webhook endpoint automatically:
+When DeliveryOne updates shipment status, your webhook endpoint automatically:
 - Updates order status in database
 - Emits real-time updates via Socket.IO
 - Sends tracking data to users
@@ -232,23 +232,23 @@ No additional code needed - webhook handler is already implemented!
 ## Troubleshooting
 
 ### Shipment not created automatically
-1. Check `SHIPROCKET_AUTO_CREATE` is set to `true`
-2. Verify Shiprocket credentials in `.env`
+1. Check `DELIVERYONE_AUTO_CREATE` is set to `true`
+2. Verify DeliveryOne credentials in `.env`
 3. Check logs for errors
 4. Ensure order has valid shipping address with pincode
 
 ### Courier assignment fails
 1. Check if delivery pincode is serviceable
-2. Verify pickup location is configured in Shiprocket
+2. Verify pickup location is configured in DeliveryOne
 3. Check package dimensions and weight
-4. Review Shiprocket courier partnerships
+4. Review DeliveryOne courier partnerships
 
 ### Tracking not updating
-1. Verify webhook URL is configured in Shiprocket dashboard
+1. Verify webhook URL is configured in DeliveryOne dashboard
 2. Check webhook endpoint is publicly accessible
 3. Review webhook logs for errors
 4. Manually sync using `syncTrackingInfo` utility
 
 ## Support
 
-For detailed API documentation, see [SHIPROCKET_INTEGRATION.md](./SHIPROCKET_INTEGRATION.md)
+For detailed API documentation, see [DELIVERYONE_INTEGRATION.md](./DELIVERYONE_INTEGRATION.md)

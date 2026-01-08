@@ -1,7 +1,7 @@
-# 🚀 Quick Deployment Guide - Shiprocket Webhook
+# 🚀 Quick Deployment Guide - DeliveryOne Webhook
 
 ## ✅ What's Done
-- Shiprocket webhook endpoint created at `/api/webhooks/shiprocket`
+- DeliveryOne webhook endpoint created at `/api/webhooks/deliveryone`
 - Deployment configuration files added
 - Code pushed to GitHub
 
@@ -41,11 +41,11 @@
    CLOUDINARY_API_SECRET=ue8YHB5bfYlwTOwHlmLouWs5l6I
    RAZORPAY_KEY_ID=rzp_test_RHMsrxS6rQOzrE
    RAZORPAY_KEY_SECRET=b263TG9jMqFP4P2cJ7KOtfTx
-   SHIPROCKET_EMAIL=tanukumar006566@gmail.com
-   SHIPROCKET_PASSWORD=qY&OXb9AsnvSou7vLSdAxsWaf$JMQr1E
-   SHIPROCKET_API_BASE_URL=https://apiv2.shiprocket.in/v1/external
-   SHIPROCKET_WEBHOOK_SECRET=your-secret-shnfhhuiprocket-webhooijook-token-12345
-   SHIPROCKET_AUTO_CREATE=true
+   DELIVERYONE_EMAIL=tanukumar006566@gmail.com
+   DELIVERYONE_PASSWORD=qY&OXb9AsnvSou7vLSdAxsWaf$JMQr1E
+   DELIVERYONE_API_BASE_URL=https://api.deliveryone.com/v1
+   DELIVERYONE_WEBHOOK_SECRET=your-secret-deliveryone-webhook-token-12345
+   DELIVERYONE_AUTO_CREATE=true
    FRONTEND_URL=https://coverghar.in
    CORS_ALLOWED_ORIGINS=https://coverghar.in,https://www.coverghar.in
    ```
@@ -55,10 +55,10 @@
    - Wait 3-5 minutes
    - Copy your URL (e.g., `https://copadmob-backend.onrender.com`)
 
-6. **Update Shiprocket**
-   - Go to: https://app.shiprocket.in/sellers/settings/additional-settings/webhooks
-   - **URL**: `https://copadmob-backend.onrender.com/api/webhooks/shiprocket`
-   - **Token**: `your-secret-shnfhhuiprocket-webhooijook-token-12345`
+6. **Update DeliveryOne**
+   - Go to: https://app.deliveryone.com/sellers/settings/additional-settings/webhooks
+   - **URL**: `https://copadmob-backend.onrender.com/api/webhooks/deliveryone`
+   - **Token**: `your-secret-deliveryone-webhook-token-12345`
    - Click **"Save"**
 
 ---
@@ -73,7 +73,7 @@ railway init
 railway up
 ```
 
-Get your URL from Railway dashboard and use it in Shiprocket.
+Get your URL from Railway dashboard and use it in DeliveryOne.
 
 ---
 
@@ -83,7 +83,7 @@ After deployment, test it:
 
 ```bash
 cd backend
-WEBHOOK_BASE_URL=https://your-render-url.onrender.com node scripts/testShiprocketWebhook.js shipped
+WEBHOOK_BASE_URL=https://your-render-url.onrender.com node scripts/testDeliveryOneWebhook.js shipped
 ```
 
 ---
@@ -105,7 +105,7 @@ WEBHOOK_BASE_URL=https://your-render-url.onrender.com node scripts/testShiprocke
 - Check if Render service is running
 
 ### "Unauthorized" Error
-- Verify token matches `SHIPROCKET_WEBHOOK_SECRET` in env vars
+- Verify token matches `DELIVERYONE_WEBHOOK_SECRET` in env vars
 
 ### 500 Error
 - Check Render logs for errors
@@ -118,7 +118,7 @@ WEBHOOK_BASE_URL=https://your-render-url.onrender.com node scripts/testShiprocke
 - `backend/render.yaml` - Render deployment config
 - `backend/DEPLOYMENT.md` - Full deployment guide
 - `backend/ENV_VARIABLES.md` - Environment variables reference
-- `backend/scripts/testShiprocketWebhook.js` - Test script
+- `backend/scripts/testDeliveryOneWebhook.js` - Test script
 
 ---
 
@@ -127,7 +127,7 @@ WEBHOOK_BASE_URL=https://your-render-url.onrender.com node scripts/testShiprocke
 After deployment, your webhook will be at:
 
 ```
-https://[your-service-name].onrender.com/api/webhooks/shiprocket
+https://[your-service-name].onrender.com/api/webhooks/deliveryone
 ```
 
 This endpoint handles:

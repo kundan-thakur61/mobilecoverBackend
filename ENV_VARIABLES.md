@@ -36,13 +36,13 @@ RAZORPAY_KEY_SECRET=your-razorpay-secret
 RAZORPAY_WEBHOOK_SECRET=your-webhook-secret
 ```
 
-### Shiprocket (Shipping)
+### DeliveryOne (Shipping)
 ```env
-SHIPROCKET_EMAIL=your-shiprocket-email@example.com
-SHIPROCKET_PASSWORD=your-shiprocket-password
-SHIPROCKET_API_BASE_URL=https://apiv2.shiprocket.in/v1/external
-SHIPROCKET_WEBHOOK_SECRET=your-random-secret-token
-SHIPROCKET_AUTO_CREATE=true
+DELIVERYONE_EMAIL=your-deliveryone-email@example.com
+DELIVERYONE_PASSWORD=your-deliveryone-password
+DELIVERYONE_API_BASE_URL=https://api.deliveryone.com/v1
+DELIVERYONE_WEBHOOK_SECRET=your-random-secret-token
+DELIVERYONE_AUTO_CREATE=true
 ```
 
 ### Webhook Configuration
@@ -139,10 +139,10 @@ Set in Razorpay Dashboard:
 https://your-domain.com/api/webhooks/razorpay
 ```
 
-### Shiprocket Webhook
-Set in Shiprocket Dashboard:
+### DeliveryOne Webhook
+Set in DeliveryOne Dashboard:
 ```
-https://your-domain.com/api/webhooks/shiprocket
+https://your-domain.com/api/webhooks/deliveryone
 ```
 
 ---

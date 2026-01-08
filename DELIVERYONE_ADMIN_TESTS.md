@@ -1,4 +1,4 @@
-# Shiprocket Admin Endpoints - Complete Test Guide
+# DeliveryOne Admin Endpoints - Complete Test Guide
 
 ## Setup Required
 
@@ -42,7 +42,7 @@ Save the token for use in subsequent requests.
 
 ### **TEST 1: Create Shipment**
 ```bash
-curl -X POST http://localhost:4000/api/shiprocket/create-shipment \
+curl -X POST http://localhost:4000/api/deliveryone/create-shipment \
   -H "Authorization: Bearer <YOUR_ADMIN_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -62,7 +62,7 @@ curl -X POST http://localhost:4000/api/shiprocket/create-shipment \
 ```json
 {
   "success": true,
-  "message": "Shipment created successfully in Shiprocket",
+  "message": "Shipment created successfully in DeliveryOne",
   "data": {
     "shipmentId": "123456789",
     "orderId": "...",
@@ -75,7 +75,7 @@ curl -X POST http://localhost:4000/api/shiprocket/create-shipment \
 
 ### **TEST 2: Get Pickup Locations**
 ```bash
-curl -X GET http://localhost:4000/api/shiprocket/pickup-locations \
+curl -X GET http://localhost:4000/api/deliveryone/pickup-locations \
   -H "Authorization: Bearer <YOUR_ADMIN_TOKEN>"
 ```
 
@@ -101,7 +101,7 @@ curl -X GET http://localhost:4000/api/shiprocket/pickup-locations \
 
 ### **TEST 3: Get Recommended Couriers**
 ```bash
-curl -X GET "http://localhost:4000/api/shiprocket/recommended-couriers/ORDER_ID_HERE?orderType=regular" \
+curl -X GET "http://localhost:4000/api/deliveryone/recommended-couriers/ORDER_ID_HERE?orderType=regular" \
   -H "Authorization: Bearer <YOUR_ADMIN_TOKEN>"
 ```
 
@@ -136,7 +136,7 @@ curl -X GET "http://localhost:4000/api/shiprocket/recommended-couriers/ORDER_ID_
 
 ### **TEST 4: Assign Courier (Auto-select Cheapest)**
 ```bash
-curl -X POST http://localhost:4000/api/shiprocket/assign-courier \
+curl -X POST http://localhost:4000/api/deliveryone/assign-courier \
   -H "Authorization: Bearer <YOUR_ADMIN_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -147,7 +147,7 @@ curl -X POST http://localhost:4000/api/shiprocket/assign-courier \
 
 **Or with specific courier:**
 ```bash
-curl -X POST http://localhost:4000/api/shiprocket/assign-courier \
+curl -X POST http://localhost:4000/api/deliveryone/assign-courier \
   -H "Authorization: Bearer <YOUR_ADMIN_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -174,7 +174,7 @@ curl -X POST http://localhost:4000/api/shiprocket/assign-courier \
 
 ### **TEST 5: Request Pickup**
 ```bash
-curl -X POST http://localhost:4000/api/shiprocket/request-pickup \
+curl -X POST http://localhost:4000/api/deliveryone/request-pickup \
   -H "Authorization: Bearer <YOUR_ADMIN_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -200,7 +200,7 @@ curl -X POST http://localhost:4000/api/shiprocket/request-pickup \
 
 ### **TEST 6: Generate Shipping Label**
 ```bash
-curl -X POST http://localhost:4000/api/shiprocket/generate-label \
+curl -X POST http://localhost:4000/api/deliveryone/generate-label \
   -H "Authorization: Bearer <YOUR_ADMIN_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -217,7 +217,7 @@ curl -X POST http://localhost:4000/api/shiprocket/generate-label \
   "data": {
     "shipmentId": "123456789",
     "awbCode": "AWB1234567890",
-    "labelUrl": "https://cdn.shiprocket.in/...",
+    "labelUrl": "https://cdn.deliveryone.com/...",
     "labelFileType": "pdf"
   }
 }
@@ -227,7 +227,7 @@ curl -X POST http://localhost:4000/api/shiprocket/generate-label \
 
 ### **TEST 7: Generate Manifest**
 ```bash
-curl -X POST http://localhost:4000/api/shiprocket/generate-manifest \
+curl -X POST http://localhost:4000/api/deliveryone/generate-manifest \
   -H "Authorization: Bearer <YOUR_ADMIN_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -242,7 +242,7 @@ curl -X POST http://localhost:4000/api/shiprocket/generate-manifest \
   "success": true,
   "message": "Manifest generated successfully",
   "data": {
-    "manifestUrl": "https://cdn.shiprocket.in/...",
+    "manifestUrl": "https://cdn.deliveryone.com/...",
     "shipmentCount": 1
   }
 }
@@ -252,7 +252,7 @@ curl -X POST http://localhost:4000/api/shiprocket/generate-manifest \
 
 ### **TEST 8: Check Serviceability (No Auth Required)**
 ```bash
-curl -X GET "http://localhost:4000/api/shiprocket/check-serviceability?pickupPincode=400001&deliveryPincode=110001"
+curl -X GET "http://localhost:4000/api/deliveryone/check-serviceability?pickupPincode=400001&deliveryPincode=110001"
 ```
 
 **Expected Response:**
@@ -276,10 +276,10 @@ curl -X GET "http://localhost:4000/api/shiprocket/check-serviceability?pickupPin
 
 ## Using Postman Collection
 
-If you have the `postman_shiprocket_collection.json` file, you can:
+If you have the `postman_deliveryone_collection.json` file, you can:
 
 1. Open Postman
-2. Import `backend/postman_shiprocket_collection.json`
+2. Import `backend/postman_deliveryone_collection.json`
 3. Set up environment variables:
    - `baseUrl`: `http://localhost:4000/api`
    - `adminToken`: (obtained from Test 0)
@@ -292,9 +292,10 @@ If you have the `postman_shiprocket_collection.json` file, you can:
 
 Ensure `.env` has these variables set:
 ```env
-SHIPROCKET_EMAIL=your-shiprocket-email@example.com
-SHIPROCKET_PASSWORD=your-shiprocket-password
-SHIPROCKET_API_BASE_URL=https://apiv2.shiprocket.in/v1/external
+DELIVERYONE_API_KEY=your-deliveryone-api-key
+DELIVERYONE_SECRET_KEY=your-deliveryone-secret-key
+DELIVERYONE_API_BASE_URL=https://api.deliveryone.com/v1
+DELIVERYONE_WEBHOOK_SECRET=your-deliveryone-webhook-secret
 ```
 
 ---
@@ -308,4 +309,3 @@ SHIPROCKET_API_BASE_URL=https://apiv2.shiprocket.in/v1/external
 | "Shipment already created" | Order already has a shipment. Use a different order |
 | "No couriers available" | Pincode may not be serviceable by any courier |
 | Connection refused | Server is not running. Run `npm run dev` |
-

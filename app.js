@@ -4,6 +4,7 @@ const fs = require('fs');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const compression = require('compression');
 const { generalLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 const logger = require('./utils/logger');
@@ -27,7 +28,7 @@ const webhookRoutes = require('./routes/webhooks');
 const wishlistRoutes = require('./routes/wishlist');
 const mobileRoutes = require('./routes/mobile');
 const collectionRoutes = require('./routes/collections');
-const shiprocketRoutes = require('./routes/shiprocket');
+const deliveryOneRoutes = require('./routes/deliveryOne');
 
 const app = express();
 
@@ -47,14 +48,36 @@ const frontendBuildPath = path.join(__dirname, '../frontend/dist');
 // throwing validation errors when those headers are present.
 app.set('trust proxy', 1);
 
+// GZIP/Brotli compression for all responses - HUGE performance boost
+app.use(compression({
+  level: 6, // Balanced compression level (1-9)
+  threshold: 1024, // Only compress responses > 1KB
+  filter: (req, res) => {
+    // Don't compress if client doesn't accept encoding
+    if (req.headers['x-no-compression']) return false;
+    // Compress all text-based responses
+    return compression.filter(req, res);
+  }
+}));
+
 // Serve static files for uploads (accessible via both /uploads and /api/uploads for dev proxying)
+// With aggressive caching for performance
 const uploadStaticDirs = [uploadsDir];
 if (path.resolve(uploadsDir) !== path.resolve(defaultUploadsPath)) {
   uploadStaticDirs.push(defaultUploadsPath);
 }
+
+// Static file options with caching
+const staticOptions = {
+  maxAge: '1y',           // Cache for 1 year (images rarely change)
+  etag: true,             // Enable ETags for validation
+  lastModified: true,     // Include Last-Modified header
+  immutable: true,        // Mark as immutable for CDN caching
+};
+
 uploadStaticDirs.forEach((dir) => {
   if (fs.existsSync(dir)) {
-    app.use(['/uploads', '/api/uploads'], express.static(dir));
+    app.use(['/uploads', '/api/uploads'], express.static(dir, staticOptions));
   }
 });
 
@@ -129,7 +152,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/mobile', mobileRoutes);
 app.use('/api/collections', collectionRoutes);
-app.use('/api/shiprocket', shiprocketRoutes);
+app.use('/api/deliveryone', deliveryOneRoutes);
 
 
 
@@ -150,7 +173,7 @@ app.get('/', (req, res) => {
       wishlist: '/api/wishlist',
       mobile: '/api/mobile',
       collections: '/api/collections',
-      shiprocket: '/api/shiprocket',
+      deliveryone: '/api/deliveryone',
       admin: '/api/admin',
       webhooks: '/api/webhooks'
     },
@@ -168,8 +191,21 @@ app.get('/api/health', (req, res) => {
 });
 
 // Serve the built React app for any non-API route
+// With aggressive caching for hashed assets
 if (fs.existsSync(frontendBuildPath)) {
-  app.use(express.static(frontendBuildPath));
+  // Assets with hashes in filename - cache for 1 year
+  app.use('/assets', express.static(path.join(frontendBuildPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+    etag: true,
+  }));
+
+  // Main build files - short cache for HTML (SPA routing)
+  app.use(express.static(frontendBuildPath, {
+    maxAge: '1h',
+    etag: true,
+    index: false, // Don't serve index.html for directory requests
+  }));
 
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {

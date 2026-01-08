@@ -100,8 +100,8 @@ const customOrderSchema = new mongoose.Schema({
   },
   trackingNumber: String,
   estimatedDelivery: Date,
-  // Shiprocket integration fields
-  shiprocket: {
+  // DeliveryOne integration fields
+  deliveryOne: {
     shipmentId: Number,
     orderId: Number,
     awbCode: String,

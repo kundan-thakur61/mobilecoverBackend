@@ -1,26 +1,26 @@
-# Shiprocket Setup Checklist
+# DeliveryOne Setup Checklist
 
-## ✅ Step 1: Add Shiprocket Credentials to .env
+## ✅ Step 1: Add DeliveryOne Credentials to .env
 
 **Status: READY TO CONFIGURE**
 
-Your `.env` file has been updated with Shiprocket configuration placeholders.
+Your `.env` file has been updated with DeliveryOne configuration placeholders.
 
 **Action Required:**
-1. Get your Shiprocket credentials:
-   - Go to https://app.shiprocket.in/
+1. Get your DeliveryOne credentials:
+   - Go to https://app.deliveryone.com/
    - Sign up or login
    - Navigate to **Settings → API**
    
 2. Update your `.env` file:
    ```env
-   SHIPROCKET_EMAIL=your-actual-email@example.com
-   SHIPROCKET_PASSWORD=your-actual-password
+   DELIVERYONE_API_KEY=your-actual-api-key
+   DELIVERYONE_SECRET_KEY=your-actual-secret-key
    ```
 
 3. Verify configuration:
    ```bash
-   npm run test:shiprocket
+   npm run test:deliveryone
    ```
 
 ---
@@ -33,11 +33,11 @@ Your `.env` file has been updated with Shiprocket configuration placeholders.
 Tests authentication, pickup locations, and serviceability:
 ```bash
 cd backend
-npm run test:shiprocket
+npm run test:deliveryone
 ```
 
 This will:
-- ✅ Authenticate with Shiprocket API
+- ✅ Authenticate with DeliveryOne API
 - ✅ Fetch your pickup locations
 - ✅ Check serviceability for sample pincodes
 - ✅ Show available couriers
@@ -56,7 +56,7 @@ npm run test:shipment
 ```
 
 This will:
-- ✅ Create a test shipment in Shiprocket
+- ✅ Create a test shipment in DeliveryOne
 - ✅ Fetch available couriers
 - ✅ Auto-assign cheapest courier
 - ✅ Generate AWB code
@@ -73,12 +73,12 @@ Then test endpoints:
 
 **Check Serviceability:**
 ```bash
-curl "http://localhost:4000/api/shiprocket/check-serviceability?pickupPincode=400001&deliveryPincode=110001"
+curl "http://localhost:4000/api/deliveryone/check-serviceability?pickupPincode=400001&deliveryPincode=110001"
 ```
 
 **Create Shipment (requires admin token):**
 ```bash
-curl -X POST http://localhost:4000/api/shiprocket/create-shipment \
+curl -X POST http://localhost:4000/api/deliveryone/create-shipment \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -89,7 +89,7 @@ curl -X POST http://localhost:4000/api/shiprocket/create-shipment \
 
 ---
 
-## ✅ Step 3: Configure Webhook URL in Shiprocket Dashboard
+## ✅ Step 3: Configure Webhook URL in DeliveryOne Dashboard
 
 **Webhook Setup Instructions:**
 
@@ -102,17 +102,17 @@ curl -X POST http://localhost:4000/api/shiprocket/create-shipment \
    ```
    This gives you a public URL like: `https://abc123.ngrok.io`
 
-2. **Configure in Shiprocket Dashboard:**
-   - Go to https://app.shiprocket.in/
+2. **Configure in DeliveryOne Dashboard:**
+   - Go to https://app.deliveryone.com/
    - Navigate to **Settings → API**
    - Find "Webhook" section
    - Add your webhook URL:
      ```
-     https://your-domain.com/api/shiprocket/webhook
+     https://your-domain.com/api/deliveryone/webhook
      ```
      Or for local testing:
      ```
-     https://abc123.ngrok.io/api/shiprocket/webhook
+     https://abc123.ngrok.io/api/deliveryone/webhook
      ```
 
 3. **Select Events to Receive:**
@@ -132,7 +132,7 @@ curl -X POST http://localhost:4000/api/shiprocket/create-shipment \
 
 **Webhook Endpoint:**
 ```
-POST /api/shiprocket/webhook
+POST /api/deliveryone/webhook
 ```
 
 **What it does automatically:**
@@ -153,7 +153,7 @@ Auto-creation allows automatic shipment creation when orders are paid.
 
 Update `.env`:
 ```env
-SHIPROCKET_AUTO_CREATE=true
+DELIVERYONE_AUTO_CREATE=true
 ```
 
 ### To Implement in Code:
@@ -161,12 +161,12 @@ SHIPROCKET_AUTO_CREATE=true
 Add to your `orderController.js` in the `verifyPayment` function:
 
 ```javascript
-const shiprocketHelper = require('../utils/shiprocketHelper');
+const deliveryOneService = require('../services/deliveryOneService');
 
 // After order payment is confirmed
-if (process.env.SHIPROCKET_AUTO_CREATE === 'true') {
-  // Non-blocking - won't fail order if Shiprocket fails
-  shiprocketHelper.autoCreateShipment(order, {
+if (process.env.DELIVERYONE_AUTO_CREATE === 'true') {
+  // Non-blocking - won't fail order if DeliveryOne fails
+  deliveryOneService.autoCreateShipment(order, {
     orderType: 'regular',
     pickupLocation: 'Primary',
     autoAssignCourier: true,  // Auto-select cheapest courier
@@ -204,7 +204,7 @@ if (process.env.SHIPROCKET_AUTO_CREATE === 'true') {
 ```bash
 npm run dev
 ```
-All Shiprocket operations will be logged to console.
+All DeliveryOne operations will be logged to console.
 
 **Production (files):**
 Logs are written to `backend/logs/` directory.
@@ -213,12 +213,12 @@ Logs are written to `backend/logs/` directory.
 
 **✅ Authentication:**
 ```
-Shiprocket authentication successful
+DeliveryOne authentication successful
 ```
 
 **✅ Shipment Creation:**
 ```
-Shiprocket order created: { orderId: '...', shipmentId: 12345, orderId: 98765 }
+DeliveryOne order created: { orderId: '...', shipmentId: 12345, orderId: 98765 }
 ```
 
 **✅ Courier Assignment:**
@@ -229,12 +229,12 @@ AWB generated: { orderId: '...', awbCode: 'AWB...' }
 
 **✅ Webhook Events:**
 ```
-Shiprocket webhook received: { order_id: 'ORD-...', current_status: 'shipped' }
+DeliveryOne webhook received: { order_id: 'ORD-...', current_status: 'shipped' }
 ```
 
 **❌ Errors:**
 ```
-Failed to auto-create Shiprocket shipment: { orderId: '...', error: '...' }
+Failed to auto-create DeliveryOne shipment: { orderId: '...', error: '...' }
 ```
 
 ### Monitor Real-time:
@@ -245,13 +245,13 @@ cd backend
 npm run dev
 ```
 
-**Filter Shiprocket logs:**
+**Filter DeliveryOne logs:**
 ```bash
 # On Linux/Mac:
-npm run dev | grep -i shiprocket
+npm run dev | grep -i deliveryone
 
 # On Windows PowerShell:
-npm run dev | Select-String "shiprocket"
+npm run dev | Select-String "deliveryone"
 ```
 
 **Production log files:**
@@ -288,13 +288,13 @@ tail -f backend/logs/combined.log
 
 1. **Add credentials to .env**
    ```env
-   SHIPROCKET_EMAIL=your@email.com
-   SHIPROCKET_PASSWORD=yourpassword
+   DELIVERYONE_API_KEY=your-api-key
+   DELIVERYONE_SECRET_KEY=your-secret-key
    ```
 
 2. **Test basic integration**
    ```bash
-   npm run test:shiprocket
+   npm run test:deliveryone
    ```
 
 3. **Create sample shipment**
@@ -302,14 +302,14 @@ tail -f backend/logs/combined.log
    npm run test:shipment
    ```
 
-4. **Configure webhook** (in Shiprocket dashboard)
+4. **Configure webhook** (in DeliveryOne dashboard)
    ```
-   https://your-domain.com/api/shiprocket/webhook
+   https://your-domain.com/api/deliveryone/webhook
    ```
 
 5. **Enable auto-creation** (optional)
    ```env
-   SHIPROCKET_AUTO_CREATE=true
+   DELIVERYONE_AUTO_CREATE=true
    ```
 
 6. **Monitor logs**
@@ -321,29 +321,29 @@ tail -f backend/logs/combined.log
 
 ## 📚 Additional Resources
 
-- **Full Documentation:** `backend/SHIPROCKET_INTEGRATION.md`
-- **Quick Start Guide:** `backend/SHIPROCKET_QUICKSTART.md`
+- **Full Documentation:** `backend/DELIVERYONE_INTEGRATION.md`
+- **Quick Start Guide:** `backend/DELIVERYONE_QUICKSTART.md`
 - **API Endpoints:** `backend/README.md`
-- **Postman Collection:** `backend/postman_shiprocket_collection.json`
+- **Postman Collection:** `backend/postman_deliveryone_collection.json`
 
 ## 🆘 Troubleshooting
 
 **Authentication fails:**
 - Verify credentials in `.env`
-- Check Shiprocket account is active
+- Check DeliveryOne account is active
 - Ensure KYC is completed
 
 **No couriers available:**
 - Check if pincodes are serviceable
-- Verify pickup location in Shiprocket dashboard
+- Verify pickup location in DeliveryOne dashboard
 - Check package dimensions
 
 **Webhook not receiving events:**
 - Ensure webhook URL is publicly accessible
-- Check URL is configured in Shiprocket dashboard
+- Check URL is configured in DeliveryOne dashboard
 - Verify events are selected
 
 **Need Help?**
-- Shiprocket API Docs: https://apidocs.shiprocket.in/
-- Shiprocket Support: support@shiprocket.com
+- DeliveryOne API Docs: https://apidocs.deliveryone.com/
+- DeliveryOne Support: support@deliveryone.com
 - Check application logs for detailed errors

@@ -4,7 +4,11 @@ const orderSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User ID is required']
+    required: false  // Optional for guest checkout
+  },
+  guestEmail: {
+    type: String,
+    trim: true
   },
   items: [{
     productId: {
@@ -75,8 +79,8 @@ const orderSchema = new mongoose.Schema({
   estimatedDelivery: Date,
   notes: String,
   cancellationReason: String,
-  // Shiprocket integration fields
-  shiprocket: {
+  // DeliveryOne integration fields
+  deliveryOne: {
     shipmentId: { type: Number, unique: true, sparse: true },
     orderId: Number,
     awbCode: String,
@@ -127,8 +131,8 @@ orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ 'payment.razorpayOrderId': 1 });
 orderSchema.index({ 'payment.razorpayPaymentId': 1 });
 
-// Unique sparse index on shiprocket.shipmentId to prevent duplicate shipments
-orderSchema.index({ 'shiprocket.shipmentId': 1 }, { unique: true, sparse: true });
+// Unique sparse index on deliveryOne.shipmentId to prevent duplicate shipments
+orderSchema.index({ 'deliveryOne.shipmentId': 1 }, { unique: true, sparse: true });
 
 // Virtual for order number
 orderSchema.virtual('orderNumber').get(function() {

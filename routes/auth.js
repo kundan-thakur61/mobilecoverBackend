@@ -3,7 +3,6 @@ const { body } = require('express-validator');
 const router = express.Router();
 
 const {
-  register,
   login,
   getMe,
   updateProfile,
@@ -14,35 +13,6 @@ const {
 const { authMiddleware } = require('../middleware/authMiddleware');
 const { authLimiter } = require('../middleware/rateLimiter');
 const validateRequest = require('../middleware/validateRequest');
-
-// Validation rules
-const registerValidation = [
-  body('name')
-    .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Name must be between 2 and 50 characters'),
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please enter a valid email'),
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long'),
-  body('phone')
-    .optional()
-    .matches(/^[0-9]{10}$/)
-    .withMessage('Please enter a valid 10-digit phone number')
-];
-
-const loginValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please enter a valid email'),
-  body('password')
-    .notEmpty()
-    .withMessage('Password is required')
-];
 
 const addressValidation = [
   body('name')
@@ -73,22 +43,19 @@ const addressValidation = [
     .withMessage('Please enter a valid 6-digit zip code')
 ];
 
-// Routes
-router.post('/register', 
+// Admin Email/Password Login Route
+router.post('/login',
   authLimiter,
-  registerValidation,
-  validateRequest,
-  register
-);
-
-router.post('/login', 
-  authLimiter,
-  loginValidation,
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required'),
   validateRequest,
   login
 );
 
-router.get('/me', 
+// Google OAuth Route - DISABLED
+// router.post('/google', googleAuth);
+
+router.get('/me',
   authMiddleware,
   getMe
 );

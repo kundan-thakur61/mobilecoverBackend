@@ -1,16 +1,16 @@
 const Order = require('../models/Order');
 const CustomOrder = require('../models/CustomOrder');
-const shiprocketService = require('../utils/shiprocket');
+const deliveryOneService = require('../utils/deliveryOne');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
 
 /**
- * Create shipment in Shiprocket for an order
- * POST /api/admin/shiprocket/create-shipment
+ * Create shipment in DeliveryOne for an order
+ * POST /api/admin/deliveryone/create-shipment
  */
 const createShipment = async (req, res, next) => {
   try {
-    console.log('[Shiprocket] Processing createShipment (v3). Request Body:', JSON.stringify(req.body, null, 2));
+    logger.info('[DeliveryOne] Processing createShipment (v3). Request Body:', JSON.stringify(req.body, null, 2));
     const { orderId, orderType = 'regular', pickupLocation, dimensions, weight } = req.body;
 
     // Get order details based on type
@@ -29,25 +29,25 @@ const createShipment = async (req, res, next) => {
     }
 
     // Check if shipment already exists
-    if (order.shiprocket?.shipmentId) {
+    if (order.deliveryone?.shipmentId) {
       return res.status(400).json({
         success: false,
         message: 'Shipment already created for this order',
         data: {
-          shipmentId: order.shiprocket.shipmentId,
-          awbCode: order.shiprocket.awbCode
+          shipmentId: order.deliveryone.shipmentId,
+          awbCode: order.deliveryone.awbCode
         }
       });
     }
 
-    // Prepare order items for Shiprocket
+    // Prepare order items for DeliveryOne
     let orderItems;
     if (orderType === 'custom') {
       const rawSku = order.variant?.sku || `CUSTOM-${orderId}`;
       let sku = String(rawSku).trim();
       
       if (sku.length > 50) {
-        console.log(`[Shiprocket] Truncating Custom SKU from ${sku.length} chars to 40 chars`);
+        logger.info(`[DeliveryOne] Truncating Custom SKU from ${sku.length} chars to 40 chars`);
         sku = sku.slice(-40);
       }
 
@@ -65,11 +65,11 @@ const createShipment = async (req, res, next) => {
         // Prefer item.sku if available, otherwise fallback to IDs
         const rawSku = item.sku || item.variantId?.toString() || item.productId?.toString() || 'SKU-NA';
         
-        // Shiprocket limit is 50 chars. Ensure we truncate if longer.
+        // DeliveryOne limit is 50 chars. Ensure we truncate if longer.
         let sku = String(rawSku).trim();
         
         if (sku.length > 50) {
-          console.log(`[Shiprocket] Truncating SKU from ${sku.length} chars to fit limit`);
+          logger.info(`[DeliveryOne] Truncating SKU from ${sku.length} chars to fit limit`);
           sku = sku.slice(-40);
         }
 
@@ -95,8 +95,8 @@ const createShipment = async (req, res, next) => {
     const email = order.userId?.email || order.shippingAddress?.email || 'customer@example.com';
     const phone = order.shippingAddress?.phone || '0000000000';
 
-    // Prepare Shiprocket order data
-    const shiprocketOrderData = {
+    // Prepare DeliveryOne order data
+    const deliveryOneOrderData = {
       orderId: orderType === 'custom' ? `CUST-${orderId}` : `ORD-${orderId}`,
       orderDate: order.createdAt.toISOString().split('T')[0],
       pickupLocation: pickupLocation || 'Primary',
@@ -121,17 +121,17 @@ const createShipment = async (req, res, next) => {
     };
 
     // Log the constructed data to verify SKU truncation before sending
-    console.log('[Shiprocket] Sending Order Data to Service:', JSON.stringify(shiprocketOrderData, null, 2));
+    logger.info('[DeliveryOne] Sending Order Data to Service:', JSON.stringify(deliveryOneOrderData, null, 2));
 
-    // Create order in Shiprocket
-    const shiprocketResponse = await shiprocketService.createOrder(shiprocketOrderData);
+    // Create order in DeliveryOne
+    const deliveryOneResponse = await deliveryOneService.createOrder(deliveryOneOrderData);
 
-    // Update order with Shiprocket details
-    order.shiprocket = {
-      shipmentId: shiprocketResponse.shipment_id,
-      orderId: shiprocketResponse.order_id,
-      status: shiprocketResponse.status,
-      statusCode: shiprocketResponse.status_code,
+    // Update order with DeliveryOne details
+    order.deliveryone = {
+      shipmentId: deliveryOneResponse.shipment_id,
+      orderId: deliveryOneResponse.order_id,
+      status: deliveryOneResponse.status,
+      statusCode: deliveryOneResponse.status_code,
       lastSyncedAt: new Date()
     };
 
@@ -139,36 +139,49 @@ const createShipment = async (req, res, next) => {
 
     // Verify the save persisted
     const savedOrder = await Order.findById(orderId);
-    logger.info('Shiprocket shipment created and saved:', {
+    logger.info('DeliveryOne shipment created and saved:', {
       orderId,
       orderType,
-      shipmentId: shiprocketResponse.shipment_id,
-      savedShipmentId: savedOrder?.shiprocket?.shipmentId,
+      shipmentId: deliveryOneResponse.shipment_id,
+      savedShipmentId: savedOrder?.deliveryone?.shipmentId,
       adminId: req.user.id
     });
 
     res.json({
       success: true,
-      message: 'Shipment created successfully in Shiprocket',
+      message: 'Shipment created successfully in DeliveryOne',
       data: {
-        shipmentId: shiprocketResponse.shipment_id,
-        orderId: shiprocketResponse.order_id,
-        status: shiprocketResponse.status
+        shipmentId: deliveryOneResponse.shipment_id,
+        orderId: deliveryOneResponse.order_id,
+        status: deliveryOneResponse.status
       }
     });
   } catch (error) {
-    logger.error('Failed to create Shiprocket shipment:', error);
+    logger.error('Failed to create DeliveryOne shipment:', error);
     next(error);
   }
 };
 
 /**
  * Assign courier and generate AWB
- * POST /api/admin/shiprocket/assign-courier
+ * POST /api/admin/deliveryone/assign-courier
+ * 
+ * IMPORTANT: Courier assignment is MANUAL only.
+ * Admin must select a courier from the recommended list.
+ * No auto-assignment to ensure admin control over shipping costs.
  */
 const assignCourier = async (req, res, next) => {
   try {
     const { orderId, orderType = 'regular', courierId } = req.body;
+
+    // Courier ID is REQUIRED - no auto-assignment
+    if (!courierId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Courier ID is required. Please select a courier from the recommended list first.',
+        hint: 'Use GET /api/admin/deliveryone/recommended-couriers/:orderId to get available couriers'
+      });
+    }
 
     let order;
     if (orderType === 'custom') {
@@ -184,54 +197,34 @@ const assignCourier = async (req, res, next) => {
       });
     }
 
-    if (!order.shiprocket?.shipmentId) {
+    if (!order.deliveryone?.shipmentId) {
       return res.status(400).json({
         success: false,
         message: 'Shipment not created yet. Create shipment first.'
       });
     }
 
-    // If no courier ID provided, get recommended couriers
-    let selectedCourierId = courierId;
-    if (!selectedCourierId) {
-      const couriers = await shiprocketService.getRecommendedCouriers(order.shiprocket.shipmentId);
-      if (couriers && couriers.length > 0) {
-        // Select the cheapest courier
-        const sortedCouriers = couriers.sort((a, b) => a.freight_charge - b.freight_charge);
-        selectedCourierId = sortedCouriers[0].courier_company_id;
-        logger.info('Auto-selected courier:', {
-          courierId: selectedCourierId,
-          courierName: sortedCouriers[0].courier_name,
-          freight: sortedCouriers[0].freight_charge
-        });
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: 'No courier services available for this shipment'
-        });
-      }
-    }
-
-    // Assign courier and generate AWB
-    const awbResponse = await shiprocketService.assignCourier(
-      order.shiprocket.shipmentId,
-      selectedCourierId
+    // Assign courier and generate AWB with the manually selected courier
+    const awbResponse = await deliveryOneService.assignCourier(
+      order.deliveryone.shipmentId,
+      courierId
     );
 
     // Update order with AWB details
-    order.shiprocket.awbCode = awbResponse.awb_code;
-    order.shiprocket.courierId = selectedCourierId;
-    order.shiprocket.courierName = awbResponse.courier_name;
-    order.shiprocket.lastSyncedAt = new Date();
+    order.deliveryone.awbCode = awbResponse.awb_code;
+    order.deliveryone.courierId = courierId;
+    order.deliveryone.courierName = awbResponse.courier_name;
+    order.deliveryone.lastSyncedAt = new Date();
     order.trackingNumber = awbResponse.awb_code;
 
     await order.save();
 
-    logger.info('Courier assigned and AWB generated:', {
+    logger.info('Courier manually assigned and AWB generated:', {
       orderId,
       orderType,
-      shipmentId: order.shiprocket.shipmentId,
+      shipmentId: order.deliveryone.shipmentId,
       awbCode: awbResponse.awb_code,
+      courierId,
       adminId: req.user.id
     });
 
@@ -241,7 +234,8 @@ const assignCourier = async (req, res, next) => {
       data: {
         awbCode: awbResponse.awb_code,
         courierName: awbResponse.courier_name,
-        shipmentId: order.shiprocket.shipmentId
+        courierId: courierId,
+        shipmentId: order.deliveryone.shipmentId
       }
     });
   } catch (error) {
@@ -252,7 +246,7 @@ const assignCourier = async (req, res, next) => {
 
 /**
  * Get recommended couriers for a shipment
- * GET /api/admin/shiprocket/recommended-couriers/:orderId
+ * GET /api/admin/deliveryone/recommended-couriers/:orderId
  */
 const getRecommendedCouriers = async (req, res, next) => {
   try {
@@ -273,11 +267,11 @@ const getRecommendedCouriers = async (req, res, next) => {
       });
     }
 
-    if (!order.shiprocket?.shipmentId) {
+    if (!order.deliveryone?.shipmentId) {
       logger.warn('getRecommendedCouriers: Shipment not created yet', {
         orderId,
         orderType,
-        shiprocket: order.shiprocket
+        deliveryone: order.deliveryone
       });
       return res.status(400).json({
         success: false,
@@ -285,7 +279,7 @@ const getRecommendedCouriers = async (req, res, next) => {
       });
     }
 
-    const couriers = await shiprocketService.getRecommendedCouriers(order.shiprocket.shipmentId);
+    const couriers = await deliveryOneService.getRecommendedCouriers(order.deliveryone.shipmentId);
 
     res.json({
       success: true,
@@ -298,15 +292,15 @@ const getRecommendedCouriers = async (req, res, next) => {
           rating: c.rating,
           etd: c.etd
         })),
-        shipmentId: order.shiprocket.shipmentId
+        shipmentId: order.deliveryone.shipmentId
       }
     });
   } catch (error) {
     if (error.response) {
-      // Propagate Shiprocket API error status and message
+      // Propagate DeliveryOne API error status and message
       return res.status(error.response.status).json({
         success: false,
-        message: error.response.data?.message || 'Shiprocket API error'
+        message: error.response.data?.message || 'DeliveryOne API error'
       });
     }
     logger.error('Failed to get recommended couriers:', error);
@@ -316,7 +310,7 @@ const getRecommendedCouriers = async (req, res, next) => {
 
 /**
  * Request pickup for shipment
- * POST /api/admin/shiprocket/request-pickup
+ * POST /api/admin/deliveryone/request-pickup
  */
 const requestPickup = async (req, res, next) => {
   try {
@@ -336,30 +330,30 @@ const requestPickup = async (req, res, next) => {
       });
     }
 
-    if (!order.shiprocket?.shipmentId) {
+    if (!order.deliveryone?.shipmentId) {
       return res.status(400).json({
         success: false,
         message: 'Shipment not created yet'
       });
     }
 
-    if (!order.shiprocket?.awbCode) {
+    if (!order.deliveryone?.awbCode) {
       return res.status(400).json({
         success: false,
         message: 'AWB not generated yet. Assign courier first.'
       });
     }
 
-    const pickupResponse = await shiprocketService.requestPickup(order.shiprocket.shipmentId);
+    const pickupResponse = await deliveryOneService.requestPickup(order.deliveryone.shipmentId);
 
-    order.shiprocket.pickupScheduledDate = new Date();
-    order.shiprocket.lastSyncedAt = new Date();
+    order.deliveryone.pickupScheduledDate = new Date();
+    order.deliveryone.lastSyncedAt = new Date();
     await order.save();
 
     logger.info('Pickup requested:', {
       orderId,
       orderType,
-      shipmentId: order.shiprocket.shipmentId,
+      shipmentId: order.deliveryone.shipmentId,
       adminId: req.user.id
     });
 
@@ -376,7 +370,7 @@ const requestPickup = async (req, res, next) => {
 
 /**
  * Track shipment
- * GET /api/shiprocket/track/:orderId
+ * GET /api/deliveryone/track/:orderId
  */
 const trackShipment = async (req, res, next) => {
   try {
@@ -397,7 +391,7 @@ const trackShipment = async (req, res, next) => {
       });
     }
 
-    if (!order.shiprocket?.awbCode) {
+    if (!order.deliveryone?.awbCode) {
       return res.status(400).json({
         success: false,
         message: 'Tracking not available yet. Shipment not created or AWB not generated.'
@@ -405,14 +399,14 @@ const trackShipment = async (req, res, next) => {
     }
 
     // Track using AWB code
-    const trackingData = await shiprocketService.trackShipment(
-      order.shiprocket.awbCode,
+    const trackingData = await deliveryOneService.trackShipment(
+      order.deliveryone.awbCode,
       'awb'
     );
 
     // Update order with latest tracking data
     if (trackingData.tracking_data) {
-      order.shiprocket.trackingData = {
+      order.deliveryone.trackingData = {
         currentStatus: trackingData.tracking_data.track_status,
         shipmentStatus: trackingData.tracking_data.shipment_status,
         shipmentTrack: trackingData.tracking_data.shipment_track?.map(t => ({
@@ -425,16 +419,16 @@ const trackShipment = async (req, res, next) => {
         deliveryDate: trackingData.tracking_data.delivered_date ? new Date(trackingData.tracking_data.delivered_date) : null,
         expectedDeliveryDate: trackingData.tracking_data.edd ? new Date(trackingData.tracking_data.edd) : null
       };
-      order.shiprocket.lastSyncedAt = new Date();
+      order.deliveryone.lastSyncedAt = new Date();
       await order.save();
     }
 
     res.json({
       success: true,
       data: {
-        awbCode: order.shiprocket.awbCode,
-        courierName: order.shiprocket.courierName,
-        trackingData: order.shiprocket.trackingData,
+        awbCode: order.deliveryone.awbCode,
+        courierName: order.deliveryone.courierName,
+        trackingData: order.deliveryone.trackingData,
         currentStatus: trackingData.tracking_data?.track_status,
         shipmentTrack: trackingData.tracking_data?.shipment_track || []
       }
@@ -447,7 +441,7 @@ const trackShipment = async (req, res, next) => {
 
 /**
  * Cancel shipment
- * POST /api/admin/shiprocket/cancel-shipment
+ * POST /api/admin/deliveryone/cancel-shipment
  */
 const cancelShipment = async (req, res, next) => {
   try {
@@ -467,24 +461,24 @@ const cancelShipment = async (req, res, next) => {
       });
     }
 
-    if (!order.shiprocket?.awbCode) {
+    if (!order.deliveryone?.awbCode) {
       return res.status(400).json({
         success: false,
         message: 'No AWB found. Shipment may not be created yet.'
       });
     }
 
-    const cancelResponse = await shiprocketService.cancelShipment([order.shiprocket.awbCode]);
+    const cancelResponse = await deliveryOneService.cancelShipment([order.deliveryone.awbCode]);
 
-    order.shiprocket.status = 'cancelled';
-    order.shiprocket.lastSyncedAt = new Date();
+    order.deliveryone.status = 'cancelled';
+    order.deliveryone.lastSyncedAt = new Date();
     order.status = 'cancelled';
     await order.save();
 
     logger.info('Shipment cancelled:', {
       orderId,
       orderType,
-      awbCode: order.shiprocket.awbCode,
+      awbCode: order.deliveryone.awbCode,
       adminId: req.user.id
     });
 
@@ -501,7 +495,7 @@ const cancelShipment = async (req, res, next) => {
 
 /**
  * Generate shipping label
- * POST /api/admin/shiprocket/generate-label
+ * POST /api/admin/deliveryone/generate-label
  */
 const generateLabel = async (req, res, next) => {
   try {
@@ -521,17 +515,17 @@ const generateLabel = async (req, res, next) => {
       });
     }
 
-    if (!order.shiprocket?.shipmentId) {
+    if (!order.deliveryone?.shipmentId) {
       return res.status(400).json({
         success: false,
         message: 'Shipment not created yet'
       });
     }
 
-    const labelResponse = await shiprocketService.generateLabel([order.shiprocket.shipmentId]);
+    const labelResponse = await deliveryOneService.generateLabel([order.deliveryone.shipmentId]);
 
-    order.shiprocket.labelUrl = labelResponse.label_url;
-    order.shiprocket.lastSyncedAt = new Date();
+    order.deliveryone.labelUrl = labelResponse.label_url;
+    order.deliveryone.lastSyncedAt = new Date();
     await order.save();
 
     res.json({
@@ -549,7 +543,7 @@ const generateLabel = async (req, res, next) => {
 
 /**
  * Generate manifest
- * POST /api/admin/shiprocket/generate-manifest
+ * POST /api/admin/deliveryone/generate-manifest
  */
 const generateManifest = async (req, res, next) => {
   try {
@@ -571,8 +565,8 @@ const generateManifest = async (req, res, next) => {
         order = await Order.findById(orderId);
       }
 
-      if (order && order.shiprocket?.shipmentId) {
-        shipmentIds.push(order.shiprocket.shipmentId);
+      if (order && order.deliveryone?.shipmentId) {
+        shipmentIds.push(order.deliveryone.shipmentId);
       }
     }
 
@@ -583,7 +577,7 @@ const generateManifest = async (req, res, next) => {
       });
     }
 
-    const manifestResponse = await shiprocketService.generateManifest(shipmentIds);
+    const manifestResponse = await deliveryOneService.generateManifest(shipmentIds);
 
     // Update orders with manifest URL
     for (const orderId of orderIds) {
@@ -594,9 +588,9 @@ const generateManifest = async (req, res, next) => {
         order = await Order.findById(orderId);
       }
 
-      if (order && order.shiprocket?.shipmentId) {
-        order.shiprocket.manifestUrl = manifestResponse.manifest_url;
-        order.shiprocket.lastSyncedAt = new Date();
+      if (order && order.deliveryone?.shipmentId) {
+        order.deliveryone.manifestUrl = manifestResponse.manifest_url;
+        order.deliveryone.lastSyncedAt = new Date();
         await order.save();
       }
     }
@@ -616,24 +610,24 @@ const generateManifest = async (req, res, next) => {
 };
 
 /**
- * Webhook handler for Shiprocket status updates
- * POST /api/shiprocket/webhook
+ * Webhook handler for DeliveryOne status updates
+ * POST /api/deliveryone/webhook
  */
 const handleWebhook = async (req, res, next) => {
   try {
     // Support raw body (from express.raw) for signature verification.
     // If raw buffer is present, verify HMAC-SHA256 using
-    // process.env.SHIPROCKET_WEBHOOK_SECRET and then parse JSON.
+    // process.env.DELIVERYONE_WEBHOOK_SECRET and then parse JSON.
     let webhookData;
     const rawBody = req.body;
 
     if (Buffer.isBuffer(rawBody)) {
-      const secret = process.env.SHIPROCKET_WEBHOOK_SECRET;
-      const sigHeader = (req.get('x-shiprocket-signature') || req.get('x-signature') || req.get('x-shiprocket-hmac') || req.get('x-hub-signature-256') || req.get('signature') || '').toString();
+      const secret = process.env.DELIVERYONE_WEBHOOK_SECRET;
+      const sigHeader = (req.get('x-deliveryone-signature') || req.get('x-signature') || req.get('x-deliveryone-hmac') || req.get('x-hub-signature-256') || req.get('signature') || '').toString();
 
       if (secret) {
         if (!sigHeader) {
-          logger.warn('Missing Shiprocket signature header');
+          logger.warn('Missing DeliveryOne signature header');
           return res.status(401).json({ success: false, message: 'Missing signature header' });
         }
 
@@ -657,12 +651,12 @@ const handleWebhook = async (req, res, next) => {
         }
 
         if (!verified) {
-          logger.warn('Invalid Shiprocket webhook signature');
+          logger.warn('Invalid DeliveryOne webhook signature');
           return res.status(401).json({ success: false, message: 'Invalid signature' });
         }
       } else {
-        logger.error('SHIPROCKET_WEBHOOK_SECRET not configured; rejecting webhook');
-        return res.status(500).json({ success: false, message: 'Server misconfiguration: SHIPROCKET_WEBHOOK_SECRET not set' });
+        logger.error('DELIVERYONE_WEBHOOK_SECRET not configured; rejecting webhook');
+        return res.status(500).json({ success: false, message: 'Server misconfiguration: DELIVERYONE_WEBHOOK_SECRET not set' });
       }
 
       // Parse JSON after successful verification (or if secret absent)
@@ -672,14 +666,14 @@ const handleWebhook = async (req, res, next) => {
       webhookData = req.body;
     }
 
-    logger.info('Shiprocket webhook received:', webhookData);
+    logger.info('DeliveryOne webhook received:', webhookData);
 
     // Extract order ID from webhook (format: ORD-xxxxx or CUST-xxxxx)
-    const orderIdFromShiprocket = webhookData.order_id;
+    const orderIdFromDeliveryOne = webhookData.order_id;
     
-    // Handle test webhooks from ShipRocket
-    if (!orderIdFromShiprocket || orderIdFromShiprocket === 'test' || orderIdFromShiprocket.includes('test')) {
-      logger.info('Test webhook received from ShipRocket');
+    // Handle test webhooks from DeliveryOne
+    if (!orderIdFromDeliveryOne || orderIdFromDeliveryOne === 'test' || orderIdFromDeliveryOne.includes('test')) {
+      logger.info('Test webhook received from DeliveryOne');
       return res.json({
         success: true,
         message: 'Test webhook acknowledged successfully',
@@ -687,8 +681,8 @@ const handleWebhook = async (req, res, next) => {
       });
     }
 
-    const isCustomOrder = orderIdFromShiprocket.startsWith('CUST-');
-    const mongoOrderId = orderIdFromShiprocket.replace(/^(ORD-|CUST-)/, '');
+    const isCustomOrder = orderIdFromDeliveryOne.startsWith('CUST-');
+    const mongoOrderId = orderIdFromDeliveryOne.replace(/^(ORD-|CUST-)/, '');
 
     let order;
     if (isCustomOrder) {
@@ -698,39 +692,39 @@ const handleWebhook = async (req, res, next) => {
     }
 
     if (!order) {
-      logger.warn('Order not found for webhook:', orderIdFromShiprocket);
+      logger.warn('Order not found for webhook:', orderIdFromDeliveryOne);
       return res.status(404).json({
         success: false,
         message: 'Order not found'
       });
     }
 
-    // Update order status based on Shiprocket status
-    const shiprocketStatus = webhookData.current_status?.toLowerCase();
+    // Update order status based on DeliveryOne status
+    const deliveryOneStatus = webhookData.current_status?.toLowerCase();
     
-    if (!order.shiprocket) {
-      order.shiprocket = {};
+    if (!order.deliveryone) {
+      order.deliveryone = {};
     }
 
-    order.shiprocket.status = shiprocketStatus;
-    order.shiprocket.statusCode = webhookData.status_code;
-    order.shiprocket.lastSyncedAt = new Date();
+    order.deliveryone.status = deliveryOneStatus;
+    order.deliveryone.statusCode = webhookData.status_code;
+    order.deliveryone.lastSyncedAt = new Date();
 
-    // Map Shiprocket status to our order status
-    if (shiprocketStatus === 'shipped' || shiprocketStatus === 'in transit') {
+    // Map DeliveryOne status to our order status
+    if (deliveryOneStatus === 'shipped' || deliveryOneStatus === 'in transit') {
       order.status = 'shipped';
-    } else if (shiprocketStatus === 'delivered') {
+    } else if (deliveryOneStatus === 'delivered') {
       order.status = 'delivered';
-    } else if (shiprocketStatus === 'cancelled' || shiprocketStatus === 'rto') {
+    } else if (deliveryOneStatus === 'cancelled' || deliveryOneStatus === 'rto') {
       order.status = 'cancelled';
-      order.shiprocket.rtoReason = webhookData.reason;
-    } else if (shiprocketStatus === 'on hold') {
-      order.shiprocket.onHoldReason = webhookData.reason;
+      order.deliveryone.rtoReason = webhookData.reason;
+    } else if (deliveryOneStatus === 'on hold') {
+      order.deliveryone.onHoldReason = webhookData.reason;
     }
 
     // Update AWB if present
     if (webhookData.awb) {
-      order.shiprocket.awbCode = webhookData.awb;
+      order.deliveryone.awbCode = webhookData.awb;
       order.trackingNumber = webhookData.awb;
     }
 
@@ -744,7 +738,7 @@ const handleWebhook = async (req, res, next) => {
           orderId: order._id,
           status: order.status,
           trackingNumber: order.trackingNumber,
-          shiprocketStatus: shiprocketStatus
+          deliveryOneStatus: deliveryOneStatus
         });
       }
     } catch (err) {
@@ -763,7 +757,7 @@ const handleWebhook = async (req, res, next) => {
 
 /**
  * Check serviceability for pincode
- * GET /api/shiprocket/check-serviceability
+ * GET /api/deliveryone/check-serviceability
  */
 const checkServiceability = async (req, res, next) => {
   try {
@@ -776,7 +770,7 @@ const checkServiceability = async (req, res, next) => {
       });
     }
 
-    const serviceabilityData = await shiprocketService.checkServiceability(
+    const serviceabilityData = await deliveryOneService.checkServiceability(
       pickupPincode,
       deliveryPincode,
       cod ? parseFloat(cod) : 0,
@@ -801,11 +795,11 @@ const checkServiceability = async (req, res, next) => {
 
 /**
  * Get pickup locations
- * GET /api/admin/shiprocket/pickup-locations
+ * GET /api/admin/deliveryone/pickup-locations
  */
 const getPickupLocations = async (req, res, next) => {
   try {
-    const locations = await shiprocketService.getPickupLocations();
+    const locations = await deliveryOneService.getPickupLocations();
 
     res.json({
       success: true,

@@ -15,9 +15,23 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
+  // Google OAuth fields
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true // Allows null values while maintaining uniqueness
+  },
+  profilePicture: {
+    type: String
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'google'
+  },
+  // Password is now optional (not required for Google OAuth users)
   passwordHash: {
     type: String,
-    required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters']
   },
   role: {
@@ -59,8 +73,10 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Hash password before saving
+// Hash password before saving (only for local auth)
 userSchema.pre('save', async function(next) {
+  // Skip if no password or using Google auth
+  if (!this.passwordHash || this.authProvider === 'google') return next();
   if (!this.isModified('passwordHash') || this.passwordHash.startsWith('$2a$')) return next();
 
   try {
@@ -83,7 +99,11 @@ userSchema.methods.toJSON = function() {
   delete userObject.passwordHash;
   delete userObject.resetPasswordToken;
   delete userObject.resetPasswordExpires;
+  delete userObject.googleId; // Don't expose Google ID
   return userObject;
 };
+
+// Index for Google ID lookup
+userSchema.index({ googleId: 1 });
 
 module.exports = mongoose.model('User', userSchema);

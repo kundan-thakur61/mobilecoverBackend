@@ -1,6 +1,10 @@
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+
+// Initialize Google OAuth client
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * Generate JWT token
@@ -30,12 +34,107 @@ const safeUserPayload = (user) => {
     role: u.role,
     phone: u.phone,
     upiId: u.upiId || null,
+    profilePicture: u.profilePicture || null,
+    authProvider: u.authProvider || 'google',
     addresses: u.addresses || [],
     isActive: u.isActive,
     emailVerified: u.emailVerified,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt
   };
+};
+
+/**
+ * Google OAuth Authentication
+ * POST /api/auth/google
+ * Verifies Google ID token and creates/logs in user
+ */
+const googleAuth = async (req, res, next) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google credential is required'
+      });
+    }
+
+    // Verify the Google ID token
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+    } catch (verifyError) {
+      logger.error('Google token verification failed:', verifyError);
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid Google token'
+      });
+    }
+
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture, email_verified } = payload;
+
+    // Check if user exists by Google ID or email
+    let user = await User.findOne({
+      $or: [{ googleId }, { email }]
+    });
+
+    if (user) {
+      // Existing user - update Google ID if not set
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.authProvider = 'google';
+        if (picture && !user.profilePicture) {
+          user.profilePicture = picture;
+        }
+        await user.save();
+        logger.info('Linked Google account to existing user:', { userId: user._id, email });
+      }
+
+      // Check if user is active
+      if (!user.isActive) {
+        return res.status(401).json({
+          success: false,
+          message: 'Account is deactivated. Please contact support.'
+        });
+      }
+    } else {
+      // New user - create account
+      user = new User({
+        name,
+        email,
+        googleId,
+        profilePicture: picture,
+        authProvider: 'google',
+        emailVerified: email_verified,
+        isActive: true
+      });
+
+      await user.save();
+      logger.info('New user registered via Google:', { userId: user._id, email });
+    }
+
+    // Generate JWT token
+    const token = generateToken(user);
+
+    logger.info('User authenticated via Google:', { userId: user._id, email: user.email });
+
+    res.json({
+      success: true,
+      message: 'Authentication successful',
+      data: {
+        user: safeUserPayload(user),
+        token
+      }
+    });
+  } catch (error) {
+    logger.error('Google auth error:', error);
+    next(error);
+  }
 };
 
 /**
@@ -247,7 +346,7 @@ const deleteAddress = async (req, res, next) => {
 };
 
 module.exports = {
-  register,
+  googleAuth,
   login,
   getMe,
   updateProfile,

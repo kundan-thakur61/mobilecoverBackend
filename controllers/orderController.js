@@ -55,7 +55,8 @@ const logger = require('../utils/logger');
 const createOrder = async (req, res, next) => {
   try {
     const { items, shippingAddress, paymentMethod = 'razorpay' } = req.body;
-    const userId = req.user.id;
+    // Support guest checkout - userId is optional
+    const userId = req.user?.id || null;
 
     // Validate items
     if (!items || items.length === 0) {
@@ -158,7 +159,7 @@ const createOrder = async (req, res, next) => {
 
     // Create order in database
     const order = new Order({
-      userId,
+      userId: userId || undefined,  // Allow null for guest orders
       items: processedItems,
       total,
       shippingAddress: {
@@ -184,7 +185,7 @@ const createOrder = async (req, res, next) => {
           currency: 'INR',
           receipt: order._id.toString(),
           notes: {
-            userId: userId.toString(),
+            userId: userId ? userId.toString() : 'guest',
             orderId: order._id.toString()
           }
         });
@@ -340,7 +341,7 @@ const createPaymentOrder = async (req, res, next) => {
         currency: 'INR',
         receipt: order._id.toString(),
         notes: {
-          userId: order.userId.toString(),
+          userId: order.userId ? order.userId.toString() : 'guest',
           orderId: order._id.toString()
         }
       });

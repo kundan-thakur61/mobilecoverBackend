@@ -3,7 +3,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const router = express.Router();
 
-const { authMiddleware } = require('../middleware/authMiddleware');
+const { authMiddleware, optionalAuth } = require('../middleware/authMiddleware');
 const { orderLimiter } = require('../middleware/rateLimiter');
 const validateRequest = require('../middleware/validateRequest');
 
@@ -47,9 +47,9 @@ const cancelValidation = [
   body('reason').optional().trim().isLength({ min: 5, max: 500 }).withMessage('Reason must be between 5 and 500 characters')
 ];
 
-// Routes
+// Routes - Guest checkout allowed
 router.post('/', 
-  authMiddleware,
+  optionalAuth,  // Allow guests
   orderLimiter,
   orderValidation,
   validateRequest,
@@ -57,14 +57,14 @@ router.post('/',
 );
 
 router.post('/pay/create', 
-  authMiddleware,
+  optionalAuth,  // Allow guests
   body('orderId').isMongoId().withMessage('Invalid order ID'),
   validateRequest,
   createPaymentOrder
 );
 
 router.post('/pay/verify', 
-  authMiddleware,
+  optionalAuth,  // Allow guests
   paymentVerificationValidation,
   validateRequest,
   verifyPayment

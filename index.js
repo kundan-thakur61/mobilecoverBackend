@@ -33,11 +33,10 @@ if (missingEnvs.length) {
 }
 
 // Database connection
+// Note: useNewUrlParser and useUnifiedTopology are deprecated in Mongoose 7+
+// These options are now default behavior and don't need to be specified
 if (process.env.NODE_ENV !== 'test') {
-  mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/mobile-cover-ecommerce', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
+  mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/mobile-cover-ecommerce')
   .then(() => logger.info('Connected to MongoDB'))
   .catch(err => logger.error('MongoDB connection error:', err));
 } else {

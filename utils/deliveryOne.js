@@ -2,9 +2,7 @@ const axios = require('axios');
 const logger = require('./logger');
 
 /**
- * Shiprocket API Integration Service
- * 
- * Documentation: https://apidocs.shiprocket.in/
+ * DeliveryOne API Integration Service
  * 
  * Features:
  * - Token-based authentication with auto-refresh
@@ -15,22 +13,22 @@ const logger = require('./logger');
  * - Return/cancellation management
  */
 
-const SHIPROCKET_API_BASE_URL = process.env.SHIPROCKET_API_BASE_URL || 'https://apiv2.shiprocket.in/v1/external';
+const DELIVERYONE_API_BASE_URL = process.env.DELIVERYONE_API_BASE_URL || 'https://api.deliveryone.com/v1';
 
-class ShiprocketService {
+class DeliveryOneService {
   constructor() {
     this.token = null;
     this.tokenExpiry = null;
-    this.email = process.env.SHIPROCKET_EMAIL;
-    this.password = process.env.SHIPROCKET_PASSWORD;
+    this.email = process.env.DELIVERYONE_EMAIL;
+    this.password = process.env.DELIVERYONE_PASSWORD;
   }
 
   /**
-   * Authenticate with Shiprocket and get access token
+   * Authenticate with DeliveryOne and get access token
    */
   async authenticate() {
     try {
-      const response = await axios.post(`${SHIPROCKET_API_BASE_URL}/auth/login`, {
+      const response = await axios.post(`${DELIVERYONE_API_BASE_URL}/auth/login`, {
         email: this.email,
         password: this.password
       });
@@ -40,14 +38,14 @@ class ShiprocketService {
         // Token typically expires in 10 days, we'll refresh after 9 days
         this.tokenExpiry = Date.now() + (9 * 24 * 60 * 60 * 1000);
         
-        logger.info('Shiprocket authentication successful');
+        logger.info('DeliveryOne authentication successful');
         return this.token;
       } else {
-        throw new Error('Invalid authentication response from Shiprocket');
+        throw new Error('Invalid authentication response from DeliveryOne');
       }
     } catch (error) {
-      logger.error('Shiprocket authentication failed:', error.response?.data || error.message);
-      throw new Error('Failed to authenticate with Shiprocket');
+      logger.error('DeliveryOne authentication failed:', error.response?.data || error.message);
+      throw new Error('Failed to authenticate with DeliveryOne');
     }
   }
 
@@ -69,7 +67,7 @@ class ShiprocketService {
       const token = await this.getToken();
       const config = {
         method,
-        url: `${SHIPROCKET_API_BASE_URL}${endpoint}`,
+        url: `${DELIVERYONE_API_BASE_URL}${endpoint}`,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -83,16 +81,16 @@ class ShiprocketService {
       const response = await axios(config);
       return response.data;
     } catch (error) {
-      logger.error(`Shiprocket API error [${method} ${endpoint}]:`, error.response?.data || error.message);
+      logger.error(`DeliveryOne API error [${method} ${endpoint}]:`, error.response?.data || error.message);
       throw error;
     }
   }
 
   /**
-   * Create order in Shiprocket
+   * Create order in DeliveryOne
    * 
    * @param {Object} orderData - Order details
-   * @returns {Promise<Object>} Shiprocket order response
+   * @returns {Promise<Object>} DeliveryOne order response
    */
   async createOrder(orderData) {
     const {
@@ -173,14 +171,14 @@ class ShiprocketService {
 
     try {
       const response = await this.request('POST', '/orders/create/adhoc', payload);
-      logger.info('Shiprocket order created:', {
+      logger.info('DeliveryOne order created:', {
         orderId,
         shipmentId: response.shipment_id,
         orderId: response.order_id
       });
       return response;
     } catch (error) {
-      logger.error('Failed to create Shiprocket order:', {
+      logger.error('Failed to create DeliveryOne order:', {
         orderId,
         error: error.response?.data || error.message
       });
@@ -191,7 +189,7 @@ class ShiprocketService {
   /**
    * Generate AWB (Airway Bill) for shipment
    * 
-   * @param {number} shipmentId - Shiprocket shipment ID
+   * @param {number} shipmentId - DeliveryOne shipment ID
    * @param {number} courierId - Courier company ID
    * @returns {Promise<Object>} AWB details
    */
@@ -221,7 +219,7 @@ class ShiprocketService {
   /**
    * Get recommended courier services for a shipment
    * 
-   * @param {number} shipmentId - Shiprocket shipment ID
+   * @param {number} shipmentId - DeliveryOne shipment ID
    * @returns {Promise<Array>} List of available couriers with rates
    */
   async getRecommendedCouriers(shipmentId) {
@@ -246,7 +244,7 @@ class ShiprocketService {
   /**
    * Assign courier to shipment
    * 
-   * @param {number} shipmentId - Shiprocket shipment ID
+   * @param {number} shipmentId - DeliveryOne shipment ID
    * @param {number} courierId - Courier company ID
    * @returns {Promise<Object>} Assignment response
    */
@@ -276,7 +274,7 @@ class ShiprocketService {
   /**
    * Request pickup for shipment
    * 
-   * @param {number} shipmentId - Shiprocket shipment ID
+   * @param {number} shipmentId - DeliveryOne shipment ID
    * @returns {Promise<Object>} Pickup request response
    */
   async requestPickup(shipmentId) {
@@ -573,6 +571,6 @@ class ShiprocketService {
 }
 
 // Create singleton instance
-const shiprocketService = new ShiprocketService();
+const deliveryOneService = new DeliveryOneService();
 
-module.exports = shiprocketService;
+module.exports = deliveryOneService;

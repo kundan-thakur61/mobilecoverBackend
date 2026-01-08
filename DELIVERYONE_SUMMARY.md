@@ -1,12 +1,12 @@
-# Shiprocket Integration - Implementation Summary
+# DeliveryOne Integration - Implementation Summary
 
 ## ✅ What Has Been Implemented
 
 ### 1. Core Service Module
-- **File**: `backend/utils/shiprocket.js`
+- **File**: `backend/utils/deliveryOne.js`
 - **Features**:
   - Token-based authentication with auto-refresh
-  - Complete Shiprocket API wrapper
+  - Complete DeliveryOne API wrapper
   - Order creation and management
   - AWB generation and courier assignment
   - Real-time tracking
@@ -17,18 +17,18 @@
 ### 2. Database Schema Updates
 - **Files**: `backend/models/Order.js`, `backend/models/CustomOrder.js`
 - **Added Fields**:
-  - `shiprocket.shipmentId` - Shiprocket shipment ID
-  - `shiprocket.orderId` - Shiprocket order ID
-  - `shiprocket.awbCode` - Airway Bill number
-  - `shiprocket.courierId` - Courier company ID
-  - `shiprocket.courierName` - Courier company name
-  - `shiprocket.labelUrl` - Shipping label URL
-  - `shiprocket.manifestUrl` - Manifest URL
-  - `shiprocket.status` - Current shipment status
-  - `shiprocket.trackingData` - Detailed tracking information
+  - `deliveryOne.shipmentId` - DeliveryOne shipment ID
+  - `deliveryOne.orderId` - DeliveryOne order ID
+  - `deliveryOne.awbCode` - Airway Bill number
+  - `deliveryOne.courierId` - Courier company ID
+  - `deliveryOne.courierName` - Courier company name
+  - `deliveryOne.labelUrl` - Shipping label URL
+  - `deliveryOne.manifestUrl` - Manifest URL
+  - `deliveryOne.status` - Current shipment status
+  - `deliveryOne.trackingData` - Detailed tracking information
 
 ### 3. Controllers
-- **File**: `backend/controllers/shiprocketController.js`
+- **File**: `backend/controllers/deliveryOneController.js`
 - **Endpoints**:
   - Create shipment
   - Assign courier and generate AWB
@@ -42,30 +42,30 @@
   - Check serviceability
 
 ### 4. Routes
-- **File**: `backend/routes/shiprocket.js`
+- **File**: `backend/routes/deliveryOne.js`
 - **Public Routes**:
-  - `GET /api/shiprocket/track/:orderId` - Track shipment
-  - `GET /api/shiprocket/check-serviceability` - Check delivery availability
+  - `GET /api/deliveryone/track/:orderId` - Track shipment
+  - `GET /api/deliveryone/check-serviceability` - Check delivery availability
   
 - **Admin Routes**:
-  - `POST /api/shiprocket/create-shipment`
-  - `POST /api/shiprocket/assign-courier`
-  - `GET /api/shiprocket/recommended-couriers/:orderId`
-  - `POST /api/shiprocket/request-pickup`
-  - `POST /api/shiprocket/cancel-shipment`
-  - `POST /api/shiprocket/generate-label`
-  - `POST /api/shiprocket/generate-manifest`
-  - `GET /api/shiprocket/pickup-locations`
+  - `POST /api/deliveryone/create-shipment`
+  - `POST /api/deliveryone/assign-courier`
+  - `GET /api/deliveryone/recommended-couriers/:orderId`
+  - `POST /api/deliveryone/request-pickup`
+  - `POST /api/deliveryone/cancel-shipment`
+  - `POST /api/deliveryone/generate-label`
+  - `POST /api/deliveryone/generate-manifest`
+  - `GET /api/deliveryone/pickup-locations`
   
 - **Webhook**:
-  - `POST /api/shiprocket/webhook` - Receive status updates
+  - `POST /api/deliveryone/webhook` - Receive status updates
 
-### 5. Helper Utilities
-- **File**: `backend/utils/shiprocketHelper.js`
+### 5. Services
+- **File**: `backend/services/deliveryOneService.js`
 - **Functions**:
   - `autoCreateShipment()` - Automatically create shipment after payment
-  - `syncTrackingInfo()` - Sync tracking data from Shiprocket
-  - `prepareOrderItems()` - Format order items for Shiprocket
+  - `syncTrackingInfo()` - Sync tracking data from DeliveryOne
+  - `prepareOrderItems()` - Format order items for DeliveryOne
   - `splitName()` - Split customer name
   - `getDefaultDimensions()` - Get default package dimensions
 
@@ -73,20 +73,21 @@
 - **File**: `backend/.env.example`
 - **Variables Added**:
   ```env
-  SHIPROCKET_EMAIL=your-shiprocket-email@example.com
-  SHIPROCKET_PASSWORD=your-shiprocket-password
-  SHIPROCKET_API_BASE_URL=https://apiv2.shiprocket.in/v1/external
+  DELIVERYONE_API_KEY=your-deliveryone-api-key
+  DELIVERYONE_SECRET_KEY=your-deliveryone-secret-key
+  DELIVERYONE_API_BASE_URL=https://api.deliveryone.com/v1
+  DELIVERYONE_WEBHOOK_SECRET=your-webhook-secret
   ```
 
 ### 7. Integration
 - **File**: `backend/app.js`
-- Routes registered at `/api/shiprocket`
+- Routes registered at `/api/deliveryone`
 
 ### 8. Documentation
 - **Files**:
-  - `SHIPROCKET_INTEGRATION.md` - Complete integration guide
-  - `SHIPROCKET_QUICKSTART.md` - Quick start examples
-  - `README.md` - Updated with Shiprocket information
+  - `DELIVERYONE_INTEGRATION.md` - Complete integration guide
+  - `DELIVERYONE_QUICKSTART.md` - Quick start examples
+  - `README.md` - Updated with DeliveryOne information
   - `.env.example` - Environment variables documented
 
 ### 9. Dependencies
@@ -99,37 +100,37 @@
 
 Add to your `.env` file:
 ```env
-SHIPROCKET_EMAIL=your-email@example.com
-SHIPROCKET_PASSWORD=your-password
-SHIPROCKET_AUTO_CREATE=true  # Optional: Auto-create shipments
+DELIVERYONE_API_KEY=your-api-key
+DELIVERYONE_SECRET_KEY=your-secret-key
+DELIVERYONE_AUTO_CREATE=true  # Optional: Auto-create shipments
 ```
 
-### Step 2: Set Up Shiprocket Account
+### Step 2: Set Up DeliveryOne Account
 
-1. Sign up at https://www.shiprocket.in/
+1. Sign up at https://www.deliveryone.com/
 2. Complete KYC verification
 3. Add pickup addresses in Settings → Pickup Addresses
-4. Configure webhook URL: `https://your-domain.com/api/shiprocket/webhook`
+4. Configure webhook URL: `https://your-domain.com/api/deliveryone/webhook`
 
 ### Step 3: Manual Workflow (Admin)
 
 ```javascript
 // 1. Create shipment
-POST /api/shiprocket/create-shipment
+POST /api/deliveryone/create-shipment
 {
   "orderId": "order-id",
   "orderType": "regular"
 }
 
 // 2. Assign courier (auto-selects cheapest if no courierId)
-POST /api/shiprocket/assign-courier
+POST /api/deliveryone/assign-courier
 {
   "orderId": "order-id",
   "orderType": "regular"
 }
 
 // 3. Request pickup
-POST /api/shiprocket/request-pickup
+POST /api/deliveryone/request-pickup
 {
   "orderId": "order-id",
   "orderType": "regular"
@@ -141,11 +142,11 @@ POST /api/shiprocket/request-pickup
 Add to order payment verification:
 
 ```javascript
-const shiprocketHelper = require('../utils/shiprocketHelper');
+const deliveryOneService = require('../services/deliveryOneService');
 
 // After payment is verified
-if (process.env.SHIPROCKET_AUTO_CREATE === 'true') {
-  shiprocketHelper.autoCreateShipment(order, {
+if (process.env.DELIVERYONE_AUTO_CREATE === 'true') {
+  deliveryOneService.autoCreateShipment(order, {
     orderType: 'regular',
     autoAssignCourier: true,
     requestPickup: false
@@ -159,7 +160,7 @@ if (process.env.SHIPROCKET_AUTO_CREATE === 'true') {
 
 ### ✅ Implemented Features
 
-1. **Order Creation** - Create shipments in Shiprocket
+1. **Order Creation** - Create shipments in DeliveryOne
 2. **Courier Assignment** - Auto-select cheapest courier or manual selection
 3. **AWB Generation** - Generate Airway Bill numbers
 4. **Real-time Tracking** - Track shipments with detailed timeline
@@ -178,32 +179,32 @@ if (process.env.SHIPROCKET_AUTO_CREATE === 'true') {
 - **Error Handling**: Comprehensive error logging
 - **Database Sync**: Tracking data synced to MongoDB
 - **Real-time Updates**: Socket.IO integration for live updates
-- **Webhook Support**: Automatic status updates from Shiprocket
+- **Webhook Support**: Automatic status updates from DeliveryOne
 - **Flexible Integration**: Both manual and automatic workflows
 
 ## 📝 API Endpoints Summary
 
 ### Public Endpoints (Authenticated Users)
 ```
-GET  /api/shiprocket/track/:orderId
-GET  /api/shiprocket/check-serviceability
+GET  /api/deliveryone/track/:orderId
+GET  /api/deliveryone/check-serviceability
 ```
 
 ### Admin Endpoints
 ```
-POST /api/shiprocket/create-shipment
-POST /api/shiprocket/assign-courier
-GET  /api/shiprocket/recommended-couriers/:orderId
-POST /api/shiprocket/request-pickup
-POST /api/shiprocket/cancel-shipment
-POST /api/shiprocket/generate-label
-POST /api/shiprocket/generate-manifest
-GET  /api/shiprocket/pickup-locations
+POST /api/deliveryone/create-shipment
+POST /api/deliveryone/assign-courier
+GET  /api/deliveryone/recommended-couriers/:orderId
+POST /api/deliveryone/request-pickup
+POST /api/deliveryone/cancel-shipment
+POST /api/deliveryone/generate-label
+POST /api/deliveryone/generate-manifest
+GET  /api/deliveryone/pickup-locations
 ```
 
 ### Webhook
 ```
-POST /api/shiprocket/webhook
+POST /api/deliveryone/webhook
 ```
 
 ## 🔧 Configuration Options
@@ -226,30 +227,30 @@ POST /api/shiprocket/webhook
 
 ## 📚 Documentation
 
-1. **SHIPROCKET_INTEGRATION.md** - Complete API documentation
+1. **DELIVERYONE_INTEGRATION.md** - Complete API documentation
    - Setup instructions
    - All endpoint details
    - Webhook configuration
    - Troubleshooting guide
 
-2. **SHIPROCKET_QUICKSTART.md** - Quick start examples
+2. **DELIVERYONE_QUICKSTART.md** - Quick start examples
    - Manual workflow
    - Automatic workflow
    - Background job setup
    - Common use cases
 
-3. **README.md** - Updated with Shiprocket section
+3. **README.md** - Updated with DeliveryOne section
 
 ## 🧪 Testing
 
 ### Test Serviceability
 ```bash
-curl "http://localhost:4000/api/shiprocket/check-serviceability?pickupPincode=400001&deliveryPincode=110001"
+curl "http://localhost:4000/api/deliveryone/check-serviceability?pickupPincode=400001&deliveryPincode=110001"
 ```
 
 ### Test Create Shipment
 ```bash
-curl -X POST http://localhost:4000/api/shiprocket/create-shipment \
+curl -X POST http://localhost:4000/api/deliveryone/create-shipment \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -d '{
@@ -260,9 +261,9 @@ curl -X POST http://localhost:4000/api/shiprocket/create-shipment \
 
 ## 🚨 Important Notes
 
-1. **Credentials Required**: You need a valid Shiprocket account with API access
-2. **KYC Mandatory**: Shiprocket account must be KYC verified
-3. **Pickup Locations**: Must be configured in Shiprocket dashboard
+1. **Credentials Required**: You need a valid DeliveryOne account with API access
+2. **KYC Mandatory**: DeliveryOne account must be KYC verified
+3. **Pickup Locations**: Must be configured in DeliveryOne dashboard
 4. **Webhook URL**: Must be publicly accessible (use ngrok for local testing)
 5. **Error Handling**: Shipment creation failures don't fail the order
 6. **Token Management**: Tokens auto-refresh every 9 days
@@ -273,21 +274,21 @@ The integration is complete and ready to use. You can:
 
 1. ✅ Start server and test endpoints
 2. ✅ Create shipments manually via admin API
-3. ✅ Enable auto-creation by setting `SHIPROCKET_AUTO_CREATE=true`
+3. ✅ Enable auto-creation by setting `DELIVERYONE_AUTO_CREATE=true`
 4. ✅ Track shipments in real-time
 5. ✅ Receive webhook updates automatically
 
 ## 📞 Support Resources
 
-- **Shiprocket API Docs**: https://apidocs.shiprocket.in/
-- **Shiprocket Dashboard**: https://app.shiprocket.in/
-- **Support Email**: support@shiprocket.com
+- **DeliveryOne API Docs**: https://apidocs.deliveryone.com/
+- **DeliveryOne Dashboard**: https://app.deliveryone.com/
+- **Support Email**: support@deliveryone.com
 
 ## 🔄 Next Steps
 
-1. Configure Shiprocket credentials in `.env`
+1. Configure DeliveryOne credentials in `.env`
 2. Test with a sample order
-3. Configure webhook URL in Shiprocket dashboard
+3. Configure webhook URL in DeliveryOne dashboard
 4. Monitor logs for successful integration
 5. Optionally enable auto-creation
 

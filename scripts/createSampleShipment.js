@@ -3,8 +3,8 @@
  * 
  * This script creates a test shipment to verify end-to-end integration.
  * Make sure you have:
- * 1. Added Shiprocket credentials to .env
- * 2. Configured pickup location in Shiprocket dashboard
+ * 1. Added DeliveryOne credentials to .env
+ * 2. Configured pickup location in DeliveryOne dashboard
  * 3. An order in your database (or use the sample data below)
  * 
  * Run: node scripts/createSampleShipment.js <orderId>
@@ -13,8 +13,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
-const shiprocketService = require('../utils/shiprocket');
-const shiprocketHelper = require('../utils/shiprocketHelper');
+const deliveryOneService = require('../utils/deliveryOne');
 const logger = require('../utils/logger');
 
 // Sample test order data (if no real order exists)
@@ -76,8 +75,8 @@ async function createTestShipment(orderId = null) {
       console.log(`Payment Status: ${order.payment?.status}\n`);
 
       // Use the helper to create shipment
-      console.log('Creating shipment in Shiprocket...');
-      const result = await shiprocketHelper.autoCreateShipment(order, {
+      console.log('Creating shipment in DeliveryOne...');
+      const result = await deliveryOneService.createOrder(order, {
         orderType: 'regular',
         pickupLocation: 'Primary',
         autoAssignCourier: true,
@@ -93,9 +92,9 @@ async function createTestShipment(orderId = null) {
           console.log(`   Courier: ${result.courierName}`);
         }
         console.log('\n✨ You can now:');
-        console.log(`   - Track shipment: GET /api/shiprocket/track/${orderId}`);
-        console.log(`   - Generate label: POST /api/shiprocket/generate-label`);
-        console.log(`   - Request pickup: POST /api/shiprocket/request-pickup\n`);
+        console.log(`   - Track shipment: GET /api/deliveryone/track/${orderId}`);
+        console.log(`   - Generate label: POST /api/deliveryone/generate-label`);
+        console.log(`   - Request pickup: POST /api/deliveryone/request-pickup\n`);
       } else {
         console.log('\n⚠️  Shipment creation had issues - check logs above');
       }
@@ -124,7 +123,7 @@ async function createSampleShipment() {
 
   try {
     // Create shipment
-    const result = await shiprocketService.createOrder(sampleOrderData);
+    const result = await deliveryOneService.createOrder(sampleOrderData);
     
     console.log('✅ Sample Shipment Created!');
     console.log(`   Shipment ID: ${result.shipment_id}`);
@@ -134,7 +133,7 @@ async function createSampleShipment() {
     // Try to get recommended couriers
     if (result.shipment_id) {
       console.log('Fetching recommended couriers...');
-      const couriers = await shiprocketService.getRecommendedCouriers(result.shipment_id);
+      const couriers = await deliveryOneService.getRecommendedCouriers(result.shipment_id);
       
       if (couriers && couriers.length > 0) {
         console.log(`✅ Found ${couriers.length} available couriers:`);
@@ -146,7 +145,7 @@ async function createSampleShipment() {
         const cheapest = couriers.sort((a, b) => a.freight_charge - b.freight_charge)[0];
         console.log(`\nAuto-assigning cheapest courier: ${cheapest.courier_name}`);
         
-        const awbResult = await shiprocketService.assignCourier(
+        const awbResult = await deliveryOneService.assignCourier(
           result.shipment_id,
           cheapest.courier_company_id
         );
@@ -155,8 +154,8 @@ async function createSampleShipment() {
           console.log(`✅ AWB Generated: ${awbResult.awb_code}\n`);
           
           console.log('✨ Test shipment is ready!');
-          console.log(`   You can track it at: https://shiprocket.co/tracking/${awbResult.awb_code}`);
-          console.log('\n⚠️  Note: This is a test shipment. Cancel it in Shiprocket dashboard if not needed.\n');
+          console.log(`   You can track it at: https://deliveryone.com/tracking/${awbResult.awb_code}`);
+          console.log('\n⚠️  Note: This is a test shipment. Cancel it in DeliveryOne dashboard if not needed.\n');
         }
       }
     }
@@ -172,7 +171,7 @@ async function createSampleShipment() {
 // Get orderId from command line argument
 const orderId = process.argv[2];
 
-console.log('🚀 Shiprocket Sample Shipment Creator\n');
+console.log('🚀 DeliveryOne Sample Shipment Creator\n');
 console.log('Usage: node scripts/createSampleShipment.js [orderId]');
 console.log('       Without orderId: Creates a test shipment with sample data');
 console.log('       With orderId: Creates shipment for an actual order from database\n');
