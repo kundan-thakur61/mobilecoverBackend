@@ -287,26 +287,26 @@ router.post('/collections',
   createCollection
 );
 
-router.put('/collections/:id',
+router.put('/collections/:handle',
   authMiddleware,
   adminMiddleware,
   updateCollection
 );
 
-router.delete('/collections/:id',
+router.delete('/collections/:handle',
   authMiddleware,
   adminMiddleware,
   deleteCollection
 );
 
-router.post('/collections/:id/images',
+router.post('/collections/:handle/images',
   authMiddleware,
   adminMiddleware,
   upload.array('images', 20),
   addCollectionImages
 );
 
-router.delete('/collections/:id/images/:imageId',
+router.delete('/collections/:handle/images/:imageId',
   authMiddleware,
   adminMiddleware,
   removeCollectionImage

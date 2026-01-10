@@ -21,6 +21,18 @@ const RAW_FALLBACK_COLLECTIONS = [
       { url: 'https://res.cloudinary.com/xxxx/FOUR.png', caption: 'Petal glass' }
     ]
   },
+  {
+    handle: 'fallback-marble-theme',
+    title: 'Fallback Marble Theme',
+    tagline: 'Elegant marble patterns for timeless appeal.',
+    accentColor: '#6b7280',
+    heroImage: 'https://res.cloudinary.com/xxxx/MARBLE_HERO.png',
+    description: 'Classic marble designs that never go out of style.',
+    images: [
+      { url: 'https://res.cloudinary.com/xxxx/MARBLE1.png', caption: 'White marble' },
+      { url: 'https://res.cloudinary.com/xxxx/MARBLE2.png', caption: 'Gray marble' }
+    ]
+  },
   // other collections…
 ];
 

@@ -41,9 +41,40 @@ const cleanUrl = (u) => {
   return v;
 };
 
+const { cloudinary } = require('../utils/cloudinary');
 
+const isValidImage = async (url) => {
+  if (!url || typeof url !== 'string') return false;
+  
+  // Check if it's a Cloudinary URL
+  if (url.includes('res.cloudinary.com')) {
+    try {
+      const publicId = extractPublicIdFromUrl(url);
+      if (!publicId) return false;
+      
+      // Attempt to get image info from Cloudinary
+      await cloudinary.api.resource(publicId);
+      return true;
+    } catch (error) {
+      // If there's an error getting the resource, it likely doesn't exist
+      console.warn('Invalid Cloudinary image detected:', url);
+      return false;
+    }
+  }
+  
+  // For non-Cloudinary URLs, we'll assume they're valid for now
+  // In production, you might want to implement additional validation
+  return true;
+};
 
-const sanitizeCollectionForClient = (doc) => {
+const extractPublicIdFromUrl = (url) => {
+  // Extract public ID from Cloudinary URL
+  const regex = /\/upload\/v\d+\/([^\/]+)(?:\.[^\/]*)?$/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+};
+
+const sanitizeCollectionForClient = async (doc) => {
   if (!doc) return doc;
   const obj = doc.toObject ? doc.toObject() : JSON.parse(JSON.stringify(doc));
   // heroImage may be { url, publicId } or a string in some code paths
@@ -55,10 +86,20 @@ const sanitizeCollectionForClient = (doc) => {
   }
 
   if (Array.isArray(obj.images)) {
-    obj.images = obj.images.map((img) => ({
-      ...img,
-      url: cleanUrl(img?.url || img?.secure_url || img?.path || img?.publicUrl || ''),
-    })).filter(img => img.url && img.url.startsWith('http'));
+    // Filter out invalid images
+    const validImages = [];
+    for (const img of obj.images) {
+      const imageUrl = cleanUrl(img?.url || img?.secure_url || img?.path || img?.publicUrl || '');
+      if (await isValidImage(imageUrl)) {
+        validImages.push({
+          ...img,
+          url: imageUrl,
+        });
+      } else {
+        console.warn('Removing invalid image from collection:', { collectionId: obj._id, image: img });
+      }
+    }
+    obj.images = validImages;
   } else {
     obj.images = [];
   }
@@ -85,7 +126,7 @@ const listCollectionsPublic = async (req, res, next) => {
       if (handle) query.handle = handle;
     }
     const items = await Collection.find(query).sort({ sortOrder: 1, createdAt: -1 });
-    const safe = items.map(sanitizeCollectionForClient);
+    const safe = await Promise.all(items.map(sanitizeCollectionForClient));
     res.json({ success: true, data: { collections: safe } });
   } catch (err) {
     logger.error('listCollectionsPublic', err);
@@ -101,7 +142,7 @@ const listCollectionsAdmin = async (req, res, next) => {
       query.isActive = activeFilter;
     }
     const items = await Collection.find(query).sort({ sortOrder: 1, createdAt: -1 });
-    const safe = items.map(sanitizeCollectionForClient);
+    const safe = await Promise.all(items.map(sanitizeCollectionForClient));
     res.json({ success: true, data: { collections: safe } });
   } catch (err) {
     logger.error('listCollectionsAdmin', err);
@@ -116,7 +157,8 @@ const getCollectionByHandle = async (req, res, next) => {
     if (!collection) {
       return res.status(404).json({ success: false, message: 'Collection not found' });
     }
-    res.json({ success: true, data: { collection: sanitizeCollectionForClient(collection) } });
+    const sanitizedCollection = await sanitizeCollectionForClient(collection);
+    res.json({ success: true, data: { collection: sanitizedCollection } });
   } catch (err) {
     logger.error('getCollectionByHandle', err);
     next(err);
@@ -157,7 +199,8 @@ const createCollection = async (req, res, next) => {
 
     const created = new Collection(payload);
     await created.save();
-    res.status(201).json({ success: true, data: sanitizeCollectionForClient(created) });
+    const sanitizedCreated = await sanitizeCollectionForClient(created);
+    res.status(201).json({ success: true, data: sanitizedCreated });
   } catch (err) {
     logger.error('createCollection', err);
     next(err);
@@ -203,7 +246,8 @@ const updateCollection = async (req, res, next) => {
     Object.assign(collection, payload);
     await collection.save();
 
-    res.json({ success: true, data: sanitizeCollectionForClient(collection) });
+    const sanitizedCollection = await sanitizeCollectionForClient(collection);
+    res.json({ success: true, data: sanitizedCollection });
   } catch (err) {
     logger.error('updateCollection', err);
     next(err);
@@ -236,7 +280,8 @@ const deleteCollection = async (req, res, next) => {
       }
     }));
 
-    res.json({ success: true, data: sanitizeCollectionForClient(doc) });
+    const sanitizedDoc = await sanitizeCollectionForClient(doc);
+    res.json({ success: true, data: sanitizedDoc });
   } catch (err) {
     logger.error('deleteCollection', err);
     next(err);
@@ -305,7 +350,8 @@ const addCollectionImages = async (req, res, next) => {
     collection.images.push(...payload);
     await collection.save();
 
-    res.status(201).json({ success: true, data: sanitizeCollectionForClient(collection) });
+    const sanitizedCollection = await sanitizeCollectionForClient(collection);
+    res.status(201).json({ success: true, data: sanitizedCollection });
   } catch (err) {
     logger.error('addCollectionImages', err);
     next(err);
@@ -338,7 +384,8 @@ const removeCollectionImage = async (req, res, next) => {
       }
     }
 
-    res.json({ success: true, data: sanitizeCollectionForClient(collection) });
+    const sanitizedCollection = await sanitizeCollectionForClient(collection);
+    res.json({ success: true, data: sanitizedCollection });
   } catch (err) {
     logger.error('removeCollectionImage', err);
     next(err);
