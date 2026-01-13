@@ -2,6 +2,7 @@ const { verifyWebhookSignature, getPaymentDetails } = require('../utils/razorpay
 const Order = require('../models/Order');
 const CustomOrder = require('../models/CustomOrder');
 const logger = require('../utils/logger');
+const { createAutoShipment, updateShiprocketOrderPayment } = require('../utils/autoShiprocket');
 
 // In-memory cache to prevent duplicate webhook processing (idempotency)
 // In production, consider using Redis for distributed systems
@@ -93,7 +94,36 @@ const handlePaymentCaptured = async (payment) => {
     amount: payment.amount / 100
   });
 
+  // Emit order update
   emitOrderUpdate(order, 'paymentSuccess', { paymentId: payment.id });
+
+  // Update existing Shiprocket order payment status, or create if doesn't exist
+  try {
+    if (order.shiprocket?.orderId) {
+      // Update existing Shiprocket order
+      const updateResult = await updateShiprocketOrderPayment(order._id, type);
+      logger.info('Shiprocket order payment update result:', {
+        orderId: order._id,
+        orderType: type,
+        updateResult
+      });
+    } else {
+      // Create new Shiprocket order if it doesn't exist
+      const autoShipmentResult = await createAutoShipment(order._id, type);
+      logger.info('Auto shipment creation result:', {
+        orderId: order._id,
+        orderType: type,
+        autoShipmentResult
+      });
+    }
+  } catch (autoShipmentError) {
+    logger.error('Error in Shiprocket order handling:', {
+      orderId: order._id,
+      orderType: type,
+      error: autoShipmentError.message
+    });
+    // Don't throw error to avoid breaking the payment flow
+  }
 
   return { success: true, message: 'Payment captured successfully' };
 };
@@ -333,7 +363,25 @@ const handleOrderPaid = async (razorpayOrder) => {
     razorpayOrderId
   });
 
+  // Emit order update
   emitOrderUpdate(order, 'paymentSuccess');
+
+  // Automatically create shipment in Shiprocket
+  try {
+    const autoShipmentResult = await createAutoShipment(order._id, type);
+    logger.info('Auto shipment creation result (order.paid):', {
+      orderId: order._id,
+      orderType: type,
+      autoShipmentResult
+    });
+  } catch (autoShipmentError) {
+    logger.error('Error in auto shipment creation (order.paid):', {
+      orderId: order._id,
+      orderType: type,
+      error: autoShipmentError.message
+    });
+    // Don't throw error to avoid breaking the payment flow
+  }
 
   return { success: true, message: 'Order paid' };
 };
@@ -492,6 +540,23 @@ exports.verifyPayment = async (req, res, next) => {
       orderType,
       razorpayPaymentId
     });
+
+    // Automatically create shipment in Shiprocket
+    try {
+      const autoShipmentResult = await createAutoShipment(order._id, orderType);
+      logger.info('Auto shipment creation result (manual verification):', {
+        orderId: order._id,
+        orderType,
+        autoShipmentResult
+      });
+    } catch (autoShipmentError) {
+      logger.error('Error in auto shipment creation (manual verification):', {
+        orderId: order._id,
+        orderType,
+        error: autoShipmentError.message
+      });
+      // Don't throw error to avoid breaking the payment flow
+    }
 
     res.json({
       success: true,

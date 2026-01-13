@@ -159,7 +159,8 @@ const register = async (req, res, next) => {
       name,
       email,
       passwordHash: password,
-      phone
+      phone,
+      authProvider: 'local'  // Set auth provider to local for regular registration
     });
 
     await user.save();
@@ -347,6 +348,7 @@ const deleteAddress = async (req, res, next) => {
 
 module.exports = {
   googleAuth,
+  register,
   login,
   getMe,
   updateProfile,

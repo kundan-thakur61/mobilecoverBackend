@@ -33,6 +33,18 @@ const RAW_FALLBACK_COLLECTIONS = [
       { url: 'https://res.cloudinary.com/xxxx/MARBLE2.png', caption: 'Gray marble' }
     ]
   },
+  {
+    handle: 'fallback-krishna-theme',
+    title: 'Fallback Krishna Theme',
+    tagline: 'Spiritual designs inspired by Krishna.',
+    accentColor: '#1e40af',
+    heroImage: 'https://res.cloudinary.com/xxxx/KRISHNA_HERO.png',
+    description: 'Beautiful Krishna-themed designs for mobile covers.',
+    images: [
+      { url: 'https://res.cloudinary.com/xxxx/KRISHNA1.png', caption: 'Krishna with flute' },
+      { url: 'https://res.cloudinary.com/xxxx/KRISHNA2.png', caption: 'Krishna art' }
+    ]
+  },
   // other collections…
 ];
 

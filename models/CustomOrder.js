@@ -102,8 +102,9 @@ const customOrderSchema = new mongoose.Schema({
   estimatedDelivery: Date,
   // DeliveryOne integration fields
   deliveryOne: {
-    shipmentId: Number,
-    orderId: Number,
+    shipmentId: String,
+    waybill: String,
+    orderId: String,
     awbCode: String,
     courierId: Number,
     courierName: String,
@@ -111,18 +112,27 @@ const customOrderSchema = new mongoose.Schema({
     labelUrl: String,
     manifestUrl: String,
     status: String,
-    statusCode: Number,
+    statusCode: String,
     onHoldReason: String,
     rtoReason: String,
     lastSyncedAt: Date,
+    deliveredDate: Date,
+    webhookHistory: [{
+      status: String,
+      payload: mongoose.Schema.Types.Mixed,
+      receivedAt: Date
+    }],
     trackingData: {
       currentStatus: String,
+      statusLocation: String,
+      statusDateTime: Date,
       shipmentStatus: String,
       shipmentTrack: [{
         status: String,
         date: Date,
         location: String,
-        activity: String
+        activity: String,
+        scannedBy: String
       }],
       pickupDate: Date,
       deliveryDate: Date,

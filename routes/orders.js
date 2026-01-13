@@ -29,7 +29,7 @@ const orderValidation = [
   body('items.*.price').optional().isFloat({ min: 0 }).withMessage('Price must be a positive number'),
   body('shippingAddress.name').trim().isLength({ min: 2, max: 50 }).withMessage('Name is required'),
   body('shippingAddress.phone').matches(/^[0-9]{7,15}$/).withMessage('Phone must be 7-15 digits'),
-  body('shippingAddress.address1').trim().isLength({ min: 5 }).withMessage('Address is required'),
+  body('shippingAddress.address1').trim().isLength({ min: 1 }).withMessage('Address is required'),
   body('shippingAddress.city').trim().isLength({ min: 2 }).withMessage('City is required'),
   body('shippingAddress.state').trim().isLength({ min: 2 }).withMessage('State is required'),
   body('shippingAddress.postalCode').trim().isLength({ min: 1 }).withMessage('Postal code is required'),

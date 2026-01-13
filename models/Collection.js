@@ -72,4 +72,8 @@ const CollectionSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Add indexes for better query performance
+CollectionSchema.index({ isActive: 1, sortOrder: 1, createdAt: -1 });
+CollectionSchema.index({ handle: 1 });
+
 module.exports = mongoose.model('Collection', CollectionSchema);

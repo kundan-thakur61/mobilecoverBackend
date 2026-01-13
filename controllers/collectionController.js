@@ -74,7 +74,54 @@ const findCollectionByIdentifier = async (identifier) => {
   }
   const handle = normalizeHandle(identifier);
   if (!handle) return null;
-  return Collection.findOne({ handle });
+  
+  // First, try to find by exact handle
+  let collection = await Collection.findOne({ handle });
+  
+  // If not found, try with fallback prefix (e.g., 'krishna-theme' -> 'fallback-krishna-theme')
+  if (!collection) {
+    const fallbackHandle = `fallback-${handle}`;
+    collection = await Collection.findOne({ handle: fallbackHandle });
+  }
+  
+  // If still not found, try removing 'fallback-' prefix if present
+  if (!collection && handle.startsWith('fallback-')) {
+    const strippedHandle = handle.substring(9); // Remove 'fallback-' prefix
+    if (strippedHandle) {
+      collection = await Collection.findOne({ handle: strippedHandle });
+    }
+  }
+  
+  // If still not found, try some common fallback mappings
+  if (!collection) {
+    // Try mapping known aliases
+    const commonMappings = {
+      'anime-theme': 'custom-studio',
+      'custom-studio': 'anime-theme',
+      'krishna-theme': 'dreamy-pastels',
+      'dreamy-pastels': 'krishna-theme',
+      'marble-theme': 'gilded-marble',
+      'gilded-marble': 'marble-theme',
+      'cricketer-theme': 'quotes-club',
+      'quotes-club': 'cricketer-theme',
+      'cute-theme': 'midnight-bloom',
+      'midnight-bloom': 'cute-theme',
+      'aesthetic-theme': 'aurora-pulse',
+      'aurora-pulse': 'aesthetic-theme',
+      'flower-theme': 'cosmic-doodles',
+      'cosmic-doodles': 'flower-theme',
+      'footballer-theme': 'footballer',
+      'footballer': 'footballer-theme',
+      'football-theme': 'footballer-theme',
+    };
+    
+    const mappedHandle = commonMappings[handle];
+    if (mappedHandle) {
+      collection = await Collection.findOne({ handle: mappedHandle });
+    }
+  }
+
+  return collection;
 };
 
 const listCollectionsPublic = async (req, res, next) => {

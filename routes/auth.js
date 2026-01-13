@@ -4,6 +4,7 @@ const router = express.Router();
 
 const {
   login,
+  register,
   getMe,
   updateProfile,
   updateAddress,
@@ -54,6 +55,17 @@ router.post('/login',
 
 // Google OAuth Route - DISABLED
 // router.post('/google', googleAuth);
+
+// Register Route
+router.post('/register',
+  authLimiter,
+  body('name').trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('phone').matches(/^[0-9]{10}$/).withMessage('Please enter a valid 10-digit phone number'),
+  validateRequest,
+  register
+);
 
 router.get('/me',
   authMiddleware,

@@ -28,7 +28,7 @@ const webhookRoutes = require('./routes/webhooks');
 const wishlistRoutes = require('./routes/wishlist');
 const mobileRoutes = require('./routes/mobile');
 const collectionRoutes = require('./routes/collections');
-const deliveryOneRoutes = require('./routes/deliveryOne');
+const shiprocketRoutes = require('./routes/shiprocket');
 
 const app = express();
 
@@ -131,11 +131,13 @@ app.use('/api', (req, res, next) => {
 // Rate limiting (centralized in middleware/rateLimiter)
 app.use('/api/', generalLimiter);
 app.use('/api/auth/', authLimiter);
-app.use('/api/payment', require('./routes/paymentRoutes'));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Payment routes (must be after body parser)
+app.use('/api/payment', require('./routes/paymentRoutes'));
 
 // Logging middleware
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
@@ -152,7 +154,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/mobile', mobileRoutes);
 app.use('/api/collections', collectionRoutes);
-app.use('/api/deliveryone', deliveryOneRoutes);
+app.use('/api/shiprocket', shiprocketRoutes);
 
 
 
@@ -173,7 +175,7 @@ app.get('/', (req, res) => {
       wishlist: '/api/wishlist',
       mobile: '/api/mobile',
       collections: '/api/collections',
-      deliveryone: '/api/deliveryone',
+      shiprocket: '/api/shiprocket',
       admin: '/api/admin',
       webhooks: '/api/webhooks'
     },

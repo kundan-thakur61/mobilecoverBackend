@@ -2,6 +2,7 @@ const Order = require('../models/Order');
 const CustomOrder = require('../models/CustomOrder');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const { paginatedQuery, findOneOptimized } = require('../utils/queryOptimizer');
 
 const formatOrderSummary = (order) => ({
   id: order._id,
@@ -67,6 +68,9 @@ const getDashboardOverview = async (req, res, next) => {
     const last7Days = new Date(now);
     last7Days.setDate(now.getDate() - 6);
 
+    // Use cached queries for better performance
+    const cacheKey = `admin_overview_${now.toISOString().slice(0, 10)}`;
+
     const [
       totalUsers,
       activeUsers,
@@ -122,19 +126,31 @@ const getDashboardOverview = async (req, res, next) => {
         { $sort: { totalQuantity: -1 } },
         { $limit: 5 }
       ]).option({ allowDiskUse: true }),
-      Order.find({})
-        .setOptions({ allowDiskUse: true })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('total status createdAt shippingAddress payment userId')
-        .populate('userId', 'name email'),
-      CustomOrder.find({})
-        .setOptions({ allowDiskUse: true })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('price status createdAt shippingAddress userId productId')
-        .populate('userId', 'name email')
-        .populate('productId', 'title model')
+      // Use optimized queries for recent orders
+      (async () => {
+        const result = await paginatedQuery(Order, {}, {
+          limit: 5,
+          sort: { createdAt: -1 },
+          select: 'total status createdAt shippingAddress payment userId',
+          populate: [{ path: 'userId', select: 'name email' }],
+          lean: true
+        });
+        return result.data;
+      })(),
+      // Use optimized queries for recent custom orders
+      (async () => {
+        const result = await paginatedQuery(CustomOrder, {}, {
+          limit: 5,
+          sort: { createdAt: -1 },
+          select: 'price status createdAt shippingAddress userId productId',
+          populate: [
+            { path: 'userId', select: 'name email' },
+            { path: 'productId', select: 'title model' }
+          ],
+          lean: true
+        });
+        return result.data;
+      })()
     ]);
 
     const salesTrendMap = salesTrendAgg.reduce((acc, item) => {

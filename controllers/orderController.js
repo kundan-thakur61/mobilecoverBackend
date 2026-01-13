@@ -47,6 +47,8 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { createOrder: createRazorpayOrder, verifyPaymentSignature } = require('../utils/razorpay');
 const logger = require('../utils/logger');
+const { paginatedQuery } = require('../utils/queryOptimizer');
+const { createAutoShipment } = require('../utils/autoShiprocket');
 
 /**
  * Create a new order
@@ -205,13 +207,27 @@ const createOrder = async (req, res, next) => {
       }
     }
 
-    // Mark COD orders as confirmed automatically
-    if (paymentMethod === 'cod') {
-      order.status = 'confirmed';
-      order.payment.status = 'pending';
-    }
-
     await order.save();
+
+    // Create Shiprocket order immediately for all orders (both COD and prepaid)
+    try {
+      const autoShipmentResult = await createAutoShipment(order._id, 'regular');
+      logger.info(`Shiprocket order created for regular order ${order._id}:`, autoShipmentResult);
+
+      // Mark COD orders as confirmed automatically
+      if (paymentMethod === 'cod') {
+        order.status = 'confirmed';
+        order.payment.status = 'pending';
+      }
+    } catch (shipmentErr) {
+      logger.error(`Failed to create Shiprocket order for regular order ${order._id}:`, shipmentErr);
+      // For prepaid orders, we can still proceed - they'll get created when payment succeeds
+      // For COD orders, we should still mark as confirmed since payment is not required
+      if (paymentMethod === 'cod') {
+        order.status = 'confirmed';
+        order.payment.status = 'pending';
+      }
+    }
 
     logger.info('Order created:', { orderId: order._id, userId, total });
 
@@ -513,20 +529,22 @@ const getAllOrders = async (req, res, next) => {
 
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
-    const skip = (pageNum - 1) * limitNum;
 
-    const totalCount = await Order.countDocuments(query);
-    let orders = await Order.find(query)
-      .sort('-createdAt')
-      .skip(skip)
-      .limit(limitNum)
-      .populate('userId', 'name email')
-      .populate('items.productId', 'title brand model type variants.images variants.color variants.price');
+    // Use optimized paginated query
+    const result = await paginatedQuery(Order, query, {
+      page: pageNum,
+      limit: limitNum,
+      sort: { createdAt: -1 },
+      populate: [
+        { path: 'userId', select: 'name email' },
+        { path: 'items.productId', select: 'title brand model type variants.images variants.color variants.price' }
+      ],
+      lean: true
+    });
 
     // Ensure all items have images - fallback to product variant images if item.image is missing
-    orders = orders.map(order => {
-      const orderObj = order.toObject();
-      orderObj.items = orderObj.items.map(item => {
+    const orders = result.data.map(order => {
+      order.items = order.items.map(item => {
         // If item.image is missing or empty, try to get it from populated product data
         if (!item.image && item.productId && typeof item.productId === 'object') {
           const variant = item.productId.variants?.find(v => v._id?.toString() === item.variantId?.toString());
@@ -539,20 +557,14 @@ const getAllOrders = async (req, res, next) => {
         }
         return item;
       });
-      return orderObj;
+      return order;
     });
 
     res.json({
       success: true,
       data: {
         orders,
-        pagination: {
-          currentPage: pageNum,
-          totalPages: Math.ceil(totalCount / limitNum),
-          totalOrders: totalCount,
-          hasNext: pageNum < Math.ceil(totalCount / limitNum),
-          hasPrev: pageNum > 1
-        }
+        pagination: result.pagination
       }
     });
   } catch (error) {
@@ -575,6 +587,7 @@ const updateOrderStatus = async (req, res, next) => {
       });
     }
 
+    const previousStatus = order.status;
     order.status = status;
     if (trackingNumber) order.trackingNumber = trackingNumber;
     if (notes) order.notes = notes;
@@ -586,6 +599,16 @@ const updateOrderStatus = async (req, res, next) => {
       status,
       adminId: req.user.id 
     });
+
+    // Create automatic shipment if order is newly confirmed
+    if (status === 'confirmed' && previousStatus !== 'confirmed') {
+      try {
+        await createAutoShipment(order._id);
+        logger.info(`Auto shipment created for manually confirmed order ${order._id}`);
+      } catch (shipmentErr) {
+        logger.error(`Failed to create auto shipment for manually confirmed order ${order._id}:`, shipmentErr);
+      }
+    }
 
     // Emit socket.io event for real-time update
     try {

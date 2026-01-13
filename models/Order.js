@@ -81,8 +81,9 @@ const orderSchema = new mongoose.Schema({
   cancellationReason: String,
   // DeliveryOne integration fields
   deliveryOne: {
-    shipmentId: { type: Number, unique: true, sparse: true },
-    orderId: Number,
+    shipmentId: { type: String, unique: true, sparse: true },
+    waybill: String,  // Added waybill field
+    orderId: String,
     awbCode: String,
     courierId: Number,
     courierName: String,
@@ -90,18 +91,72 @@ const orderSchema = new mongoose.Schema({
     labelUrl: String,
     manifestUrl: String,
     status: String,
-    statusCode: Number,
+    statusCode: String,
     onHoldReason: String,
     rtoReason: String,
     lastSyncedAt: Date,
+    deliveredDate: Date,
+    webhookHistory: [{
+      status: String,
+      payload: mongoose.Schema.Types.Mixed,
+      receivedAt: Date
+    }],
     trackingData: {
       currentStatus: String,
+      statusLocation: String,
+      statusDateTime: Date,
       shipmentStatus: String,
       shipmentTrack: [{
         status: String,
         date: Date,
         location: String,
-        activity: String
+        activity: String,
+        scannedBy: String
+      }],
+      pickupDate: Date,
+      deliveryDate: Date,
+      expectedDeliveryDate: Date,
+      weight: Number,
+      dimensions: {
+        length: Number,
+        breadth: Number,
+        height: Number
+      }
+    }
+  },
+  
+  // Shiprocket integration fields
+  shiprocket: {
+    orderId: { type: Number, unique: true, sparse: true },
+    shipmentId: Number,
+    awbCode: String,
+    courierId: Number,
+    courierName: String,
+    pickupScheduledDate: Date,
+    labelUrl: String,
+    manifestUrl: String,
+    status: String,
+    trackingUrl: String,
+    onHoldReason: String,
+    rtoReason: String,
+    lastSyncedAt: Date,
+    deliveredDate: Date,
+    webhookHistory: [{
+      status: String,
+      payload: mongoose.Schema.Types.Mixed,
+      receivedAt: Date
+    }],
+    trackingData: {
+      currentStatus: String,
+      statusLocation: String,
+      statusDateTime: Date,
+      shipmentStatus: String,
+      shipmentTrack: [{
+        status: String,
+        date: Date,
+        location: String,
+        activity: String,
+        substatus: String
       }],
       pickupDate: Date,
       deliveryDate: Date,

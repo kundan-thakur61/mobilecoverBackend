@@ -139,11 +139,7 @@ Set in Razorpay Dashboard:
 https://your-domain.com/api/webhooks/razorpay
 ```
 
-### DeliveryOne Webhook
-Set in DeliveryOne Dashboard:
-```
-https://your-domain.com/api/webhooks/deliveryone
-```
+
 
 ---
 

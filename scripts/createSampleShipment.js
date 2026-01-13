@@ -1,30 +1,35 @@
 /**
- * Create Sample Shipment Test
+ * DELHIVERY SAMPLE SHIPMENT CREATOR - CORRECTED VERSION
  * 
- * This script creates a test shipment to verify end-to-end integration.
- * Make sure you have:
- * 1. Added DeliveryOne credentials to .env
- * 2. Configured pickup location in DeliveryOne dashboard
- * 3. An order in your database (or use the sample data below)
+ * This script creates a test shipment to verify end-to-end Delhivery integration.
  * 
- * Run: node scripts/createSampleShipment.js <orderId>
+ * Setup Requirements:
+ * 1. Add DELHIVERY_API_KEY to .env file
+ * 2. Configure pickup location in Delhivery dashboard
+ * 3. Ensure .env has all required variables (see .env.example)
+ * 
+ * Usage:
+ *   node scripts/createSampleShipment.js                  # Create test shipment with sample data
+ *   node scripts/createSampleShipment.js <orderId>        # Create shipment for real order
+ *   node scripts/createSampleShipment.js --track <waybill> # Track existing shipment
  */
 
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
-const deliveryOneService = require('../utils/deliveryOne');
+const User = require('../models/User');
+const delhiveryService = require('../utils/deliveryOne');
 const logger = require('../utils/logger');
 
-// Sample test order data (if no real order exists)
+// Sample test order data
 const sampleOrderData = {
   orderId: `TEST-${Date.now()}`,
   orderDate: new Date().toISOString().split('T')[0],
-  pickupLocation: 'Primary',
+  pickupLocation: process.env.DELHIVERY_PICKUP_LOCATION || 'Primary',
   billingCustomerName: 'Test',
   billingLastName: 'Customer',
-  billingAddress: 'Test Address Line 1',
-  billingAddress2: 'Test Address Line 2',
+  billingAddress: '123 Test Street, Apartment 4B',
+  billingAddress2: 'Near Central Mall',
   billingCity: 'Mumbai',
   billingPincode: '400001',
   billingState: 'Maharashtra',
@@ -36,6 +41,7 @@ const sampleOrderData = {
     name: 'Custom Mobile Cover',
     sku: 'TEST-SKU-001',
     units: 1,
+    quantity: 1,
     selling_price: 499,
     discount: 0,
     tax: 0,
@@ -49,143 +55,300 @@ const sampleOrderData = {
   weight: 0.15
 };
 
-async function createTestShipment(orderId = null) {
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+function printHeader(text) {
+  console.log('\n' + '='.repeat(80));
+  console.log('  ' + text);
+  console.log('='.repeat(80) + '\n');
+}
+
+function printSuccess(text) {
+  console.log('✅ ' + text);
+}
+
+function printError(text) {
+  console.log('❌ ' + text);
+}
+
+function printInfo(text) {
+  console.log('ℹ️  ' + text);
+}
+
+function printWarning(text) {
+  console.log('⚠️  ' + text);
+}
+
+// =============================================================================
+// Track Shipment Function
+// =============================================================================
+
+async function trackShipment(waybill) {
   try {
-    console.log('\n📦 Creating Test Shipment...\n');
+    printHeader('TRACKING SHIPMENT');
+    printInfo(`Tracking waybill: ${waybill}`);
 
-    // Connect to database if orderId is provided
-    if (orderId) {
-      console.log('Connecting to database...');
-      await mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI);
-      console.log('✅ Connected to database\n');
+    const trackingData = await delhiveryService.trackShipment(waybill);
 
-      // Find the order
-      const order = await Order.findById(orderId).populate('userId');
-      
-      if (!order) {
-        console.log('❌ Order not found!');
-        console.log('Creating a sample test shipment instead...\n');
-        await createSampleShipment();
-        return;
-      }
-
-      console.log(`Found order: ${order._id}`);
-      console.log(`Customer: ${order.shippingAddress?.name}`);
-      console.log(`Total: ₹${order.total}`);
-      console.log(`Payment Status: ${order.payment?.status}\n`);
-
-      // Use the helper to create shipment
-      console.log('Creating shipment in DeliveryOne...');
-      const result = await deliveryOneService.createOrder(order, {
-        orderType: 'regular',
-        pickupLocation: 'Primary',
-        autoAssignCourier: true,
-        requestPickup: false
-      });
-
-      if (result && result.success) {
-        console.log('\n✅ Shipment Created Successfully!');
-        console.log(`   Shipment ID: ${result.shipmentId}`);
-        console.log(`   Order ID: ${result.orderId}`);
-        if (result.awbCode) {
-          console.log(`   AWB Code: ${result.awbCode}`);
-          console.log(`   Courier: ${result.courierName}`);
-        }
-        console.log('\n✨ You can now:');
-        console.log(`   - Track shipment: GET /api/deliveryone/track/${orderId}`);
-        console.log(`   - Generate label: POST /api/deliveryone/generate-label`);
-        console.log(`   - Request pickup: POST /api/deliveryone/request-pickup\n`);
-      } else {
-        console.log('\n⚠️  Shipment creation had issues - check logs above');
-      }
-
-      await mongoose.disconnect();
-
-    } else {
-      // Create sample shipment without database
-      await createSampleShipment();
+    if (!trackingData.ShipmentData || trackingData.ShipmentData.length === 0) {
+      printError('No tracking data found for this waybill');
+      return;
     }
 
+    const shipment = trackingData.ShipmentData[0].Shipment;
+    const status = shipment.Status;
+
+    printSuccess('Tracking Data Retrieved');
+    console.log('\n📦 Current Status:');
+    console.log(`   Status: ${status.Status}`);
+    console.log(`   Location: ${status.StatusLocation}`);
+    console.log(`   Date/Time: ${status.StatusDateTime}`);
+    console.log(`   Instructions: ${status.Instructions || 'N/A'}`);
+
+    if (shipment.Scans && shipment.Scans.length > 0) {
+      console.log('\n📊 Tracking History:');
+      shipment.Scans.reverse().forEach((scan, index) => {
+        const detail = scan.ScanDetail;
+        console.log(`   ${index + 1}. ${detail.Scan}`);
+        console.log(`      Date: ${detail.ScanDateTime}`);
+        console.log(`      Location: ${detail.ScanLocation}`);
+        console.log(`      Details: ${detail.Instructions || 'N/A'}`);
+      });
+    }
+
+    console.log(`\n🔗 Track online: https://www.delhivery.com/track/package/${waybill}\n`);
   } catch (error) {
-    console.error('\n❌ Error:', error.message);
+    printError(`Tracking failed: ${error.message}`);
     if (error.response?.data) {
       console.error('API Response:', JSON.stringify(error.response.data, null, 2));
+    }
+  }
+}
+
+// =============================================================================
+// Create Shipment for Real Order
+// =============================================================================
+
+async function createShipmentForOrder(orderId) {
+  try {
+    printHeader('CREATING SHIPMENT FOR REAL ORDER');
+    printInfo('Connecting to database...');
+    
+    await mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI);
+    printSuccess('Connected to database');
+
+    // Find the order
+    const order = await Order.findById(orderId).populate('userId');
+    
+    if (!order) {
+      printError('Order not found!');
+      printInfo('Creating a sample test shipment instead...');
+      await mongoose.disconnect();
+      return createSampleShipment();
+    }
+
+    printSuccess(`Found order: ${order._id}`);
+    console.log(`   Customer: ${order.shippingAddress?.name}`);
+    console.log(`   Total: ₹${order.total}`);
+    console.log(`   Payment: ${order.payment?.status}`);
+    console.log(`   Status: ${order.status}`);
+
+    // Check if shipment already exists
+    if (order.deliveryOne?.waybill) {
+      printWarning('Shipment already exists for this order!');
+      console.log(`   Waybill: ${order.deliveryOne.waybill}`);
+      console.log(`   Status: ${order.deliveryOne.status}`);
+      
+      const shouldTrack = process.argv.includes('--track') || process.argv.includes('-t');
+      if (shouldTrack) {
+        await mongoose.disconnect();
+        return trackShipment(order.deliveryOne.waybill);
+      }
+      
+      printInfo('Use --track flag to see tracking details');
+      await mongoose.disconnect();
+      return;
+    }
+
+    // Prepare order data
+    const fullName = order.shippingAddress?.name || order.userId?.name || 'Customer';
+    const nameParts = fullName.trim().split(' ');
+    
+    const orderData = {
+      orderId: `ORD-${orderId}`,
+      orderDate: order.createdAt.toISOString().split('T')[0],
+      pickupLocation: process.env.DELHIVERY_PICKUP_LOCATION || 'Primary',
+      billingCustomerName: nameParts[0],
+      billingLastName: nameParts.slice(1).join(' ') || '',
+      billingAddress: order.shippingAddress?.address1 || order.shippingAddress?.street,
+      billingAddress2: order.shippingAddress?.address2 || '',
+      billingCity: order.shippingAddress?.city,
+      billingPincode: order.shippingAddress?.postalCode || order.shippingAddress?.zipCode,
+      billingState: order.shippingAddress?.state,
+      billingCountry: order.shippingAddress?.country || 'India',
+      billingEmail: order.userId?.email || 'customer@example.com',
+      billingPhone: order.shippingAddress?.phone || '0000000000',
+      shippingIsBilling: true,
+      orderItems: order.items.map(item => ({
+        name: item.title || 'Product',
+        sku: item.sku || item.variantId?.toString() || 'SKU-NA',
+        units: item.quantity,
+        quantity: item.quantity,
+        selling_price: item.price,
+        discount: 0,
+        tax: 0,
+        hsn: 392690
+      })),
+      paymentMethod: order.payment?.status === 'paid' ? 'Prepaid' : 'COD',
+      subTotal: order.total,
+      length: 15,
+      breadth: 10,
+      height: 2,
+      weight: 0.15
+    };
+
+    printInfo('Creating shipment in Delhivery...');
+    const result = await delhiveryService.createOrder(orderData);
+
+    if (result && result.success) {
+      printSuccess('Shipment Created Successfully!');
+      console.log(`   Shipment ID: ${result.shipment_id}`);
+      console.log(`   Waybill: ${result.waybill}`);
+      console.log(`   Order ID: ${result.order_id}`);
+      console.log(`   Status: ${result.status}`);
+
+      // Update order in database
+      order.deliveryOne = {
+        shipmentId: result.shipment_id,
+        waybill: result.waybill,
+        awbCode: result.waybill,
+        orderId: result.order_id,
+        status: result.status,
+        lastSyncedAt: new Date()
+      };
+      order.trackingNumber = result.waybill;
+      await order.save();
+
+      printSuccess('Order updated in database');
+      
+      console.log('\n✨ Next Steps:');
+      console.log(`   📍 Track: node scripts/createSampleShipment.js --track ${result.waybill}`);
+      console.log(`   🔗 Online: https://www.delhivery.com/track/package/${result.waybill}`);
+      console.log(`   📋 Dashboard: https://one.delhivery.com`);
+    } else {
+      printWarning('Shipment creation had issues - check logs above');
+    }
+
+    await mongoose.disconnect();
+  } catch (error) {
+    printError(`Error: ${error.message}`);
+    if (error.response?.data) {
+      console.error('\nAPI Response:', JSON.stringify(error.response.data, null, 2));
+    }
+    
+    if (error.message.includes('DELHIVERY_API_KEY')) {
+      printError('\n🔑 API Key Missing!');
+      console.log('   Please add DELHIVERY_API_KEY to your .env file');
+      console.log('   Get it from: https://one.delhivery.com > Settings > API Setup');
+    }
+    
+    try {
+      await mongoose.disconnect();
+    } catch (e) {
+      // Ignore disconnect errors
     }
     process.exit(1);
   }
 }
 
+// =============================================================================
+// Create Sample Test Shipment
+// =============================================================================
+
 async function createSampleShipment() {
-  console.log('Creating sample test shipment (no database)...\n');
+  printHeader('CREATING SAMPLE TEST SHIPMENT');
+  
   console.log('📋 Sample Order Details:');
   console.log(JSON.stringify(sampleOrderData, null, 2));
-  console.log('\n');
+  console.log('');
 
   try {
-    // Create shipment
-    const result = await deliveryOneService.createOrder(sampleOrderData);
+    printInfo('Creating shipment in Delhivery...');
+    const result = await delhiveryService.createOrder(sampleOrderData);
     
-    console.log('✅ Sample Shipment Created!');
-    console.log(`   Shipment ID: ${result.shipment_id}`);
-    console.log(`   Order ID: ${result.order_id}`);
-    console.log(`   Status: ${result.status}\n`);
+    if (result && result.success) {
+      printSuccess('Sample Shipment Created!');
+      console.log(`   Shipment ID: ${result.shipment_id}`);
+      console.log(`   Waybill: ${result.waybill}`);
+      console.log(`   Order ID: ${result.order_id}`);
+      console.log(`   Status: ${result.status}`);
 
-    // Try to get recommended couriers
-    if (result.shipment_id) {
-      console.log('Fetching recommended couriers...');
-      const couriers = await deliveryOneService.getRecommendedCouriers(result.shipment_id);
+      console.log('\n✨ Next Steps:');
+      console.log(`   📍 Track: node scripts/createSampleShipment.js --track ${result.waybill}`);
+      console.log(`   🔗 Online: https://www.delhivery.com/track/package/${result.waybill}`);
+      console.log(`   📋 Dashboard: https://one.delhivery.com`);
       
-      if (couriers && couriers.length > 0) {
-        console.log(`✅ Found ${couriers.length} available couriers:`);
-        couriers.slice(0, 5).forEach((c, i) => {
-          console.log(`   ${i + 1}. ${c.courier_name} - ₹${c.freight_charge} (${c.estimated_delivery_days})`);
-        });
-
-        // Auto-assign cheapest courier
-        const cheapest = couriers.sort((a, b) => a.freight_charge - b.freight_charge)[0];
-        console.log(`\nAuto-assigning cheapest courier: ${cheapest.courier_name}`);
-        
-        const awbResult = await deliveryOneService.assignCourier(
-          result.shipment_id,
-          cheapest.courier_company_id
-        );
-
-        if (awbResult.awb_code) {
-          console.log(`✅ AWB Generated: ${awbResult.awb_code}\n`);
-          
-          console.log('✨ Test shipment is ready!');
-          console.log(`   You can track it at: https://deliveryone.com/tracking/${awbResult.awb_code}`);
-          console.log('\n⚠️  Note: This is a test shipment. Cancel it in DeliveryOne dashboard if not needed.\n');
-        }
-      }
+      printWarning('\nNote: This is a test shipment. Cancel it in Delhivery dashboard if not needed.');
+    } else {
+      printError('Failed to create sample shipment');
+      console.log('Response:', JSON.stringify(result, null, 2));
     }
-
   } catch (error) {
-    console.error('Failed to create sample shipment:', error.message);
+    printError(`Failed to create sample shipment: ${error.message}`);
     if (error.response?.data) {
       console.error('Details:', JSON.stringify(error.response.data, null, 2));
+    }
+    
+    if (error.message.includes('DELHIVERY_API_KEY')) {
+      printError('\n🔑 API Key Missing!');
+      console.log('   Please add DELHIVERY_API_KEY to your .env file');
+      console.log('   Get it from: https://one.delhivery.com > Settings > API Setup');
     }
   }
 }
 
-// Get orderId from command line argument
-const orderId = process.argv[2];
+// =============================================================================
+// Main Execution
+// =============================================================================
 
-console.log('🚀 DeliveryOne Sample Shipment Creator\n');
-console.log('Usage: node scripts/createSampleShipment.js [orderId]');
-console.log('       Without orderId: Creates a test shipment with sample data');
-console.log('       With orderId: Creates shipment for an actual order from database\n');
+async function main() {
+  printHeader('🚀 DELHIVERY SHIPMENT CREATOR');
+  
+  console.log('Usage:');
+  console.log('  node scripts/createSampleShipment.js                  # Create test shipment');
+  console.log('  node scripts/createSampleShipment.js <orderId>        # Create for real order');
+  console.log('  node scripts/createSampleShipment.js --track <waybill> # Track shipment');
+  console.log('');
 
-if (orderId) {
-  console.log(`Using order ID: ${orderId}\n`);
-} else {
-  console.log('No order ID provided - will create sample test shipment\n');
+  // Check for tracking request
+  const trackIndex = process.argv.indexOf('--track') || process.argv.indexOf('-t');
+  if (trackIndex !== -1 && process.argv[trackIndex + 1]) {
+    const waybill = process.argv[trackIndex + 1];
+    return trackShipment(waybill);
+  }
+
+  // Get order ID from command line
+  const orderId = process.argv[2];
+
+  if (orderId && !orderId.startsWith('--')) {
+    printInfo(`Using order ID: ${orderId}`);
+    return createShipmentForOrder(orderId);
+  } else {
+    printInfo('No order ID provided - creating sample test shipment');
+    return createSampleShipment();
+  }
 }
 
-createTestShipment(orderId).then(() => {
-  console.log('Done!');
-  process.exit(0);
-}).catch((error) => {
-  console.error('Unexpected error:', error);
-  process.exit(1);
-});
+// Run the script
+main()
+  .then(() => {
+    printSuccess('\nDone!');
+    process.exit(0);
+  })
+  .catch((error) => {
+    printError('\nUnexpected error:');
+    console.error(error);
+    process.exit(1);
+  });
