@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { razorpayWebhook, verifyPayment, getPaymentStatus } = require('../controllers/paymentController');
-const { authMiddleware } = require('../middleware/authMiddleware');
+const { authMiddleware, optionalAuth } = require('../middleware/authMiddleware');
 
 /**
  * @route   POST /api/payment/webhook
@@ -17,15 +17,15 @@ router.post(
 /**
  * @route   POST /api/payment/verify
  * @desc    Verify payment signature after checkout
- * @access  Private (requires auth)
+ * @access  Public (uses optional auth)
  */
-router.post('/verify', authMiddleware, verifyPayment);
+router.post('/verify', optionalAuth, verifyPayment);
 
 /**
  * @route   GET /api/payment/status/:orderId
  * @desc    Get payment status for an order
  * @access  Private (requires auth)
  */
-router.get('/status/:orderId', authMiddleware, getPaymentStatus);
+router.get('/status/:orderId', optionalAuth, getPaymentStatus);
 
 module.exports = router;

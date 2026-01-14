@@ -186,8 +186,8 @@ orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ 'payment.razorpayOrderId': 1 });
 orderSchema.index({ 'payment.razorpayPaymentId': 1 });
 
-// Unique sparse index on deliveryOne.shipmentId to prevent duplicate shipments
-orderSchema.index({ 'deliveryOne.shipmentId': 1 }, { unique: true, sparse: true });
+// Unique sparse index on shiprocket.orderId to prevent duplicate shipments
+orderSchema.index({ 'shiprocket.orderId': 1 }, { unique: true, sparse: true });
 
 // Virtual for order number
 orderSchema.virtual('orderNumber').get(function() {

@@ -307,7 +307,7 @@ class ShiprocketService {
         order_date: orderDate || new Date().toISOString().split('T')[0],
         pickup_location: pickupLocationValue, // Use pickup location name or ID
         channel_id: null,
-        comment: `Order from CopadMob - ${orderId}`,
+        comment: `Order from CoverGhar - ${orderId}`,
         billing_customer_name: billingCustomerName,
         billing_last_name: '',
         billing_address: billingAddress,

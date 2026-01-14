@@ -89,6 +89,8 @@ app.use(helmet({
 const defaultAllowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3001',
   'https://coverghar.in',
   'https://www.coverghar.in'
 ];
@@ -111,6 +113,10 @@ app.use(cors({
     
     // Allow all Vercel preview deployments (*.vercel.app)
     if (origin.includes('.vercel.app')) return callback(null, true);
+    
+    // In development, allow localhost with any port
+    if (process.env.NODE_ENV === 'development' && origin.startsWith('http://localhost:')) return callback(null, true);
+    if (process.env.NODE_ENV === 'development' && origin.startsWith('http://127.0.0.1:')) return callback(null, true);
     
     // Reject all other origins
     return callback(new Error('Not allowed by CORS'));

@@ -525,14 +525,6 @@ exports.verifyPayment = async (req, res, next) => {
       });
     }
 
-    // For authenticated users, ensure they own the order
-    if (req.user && order.userId && req.user.id !== order.userId.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You do not own this order.'
-      });
-    }
-
     // Update order payment details
     order.payment.razorpayOrderId = razorpayOrderId;
     order.payment.razorpayPaymentId = razorpayPaymentId;
@@ -604,17 +596,6 @@ exports.getPaymentStatus = async (req, res, next) => {
         message: 'Order not found'
       });
     }
-
-    // For authenticated users, ensure they own the order
-    if (req.user && order.userId && req.user.id !== order.userId.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You do not own this order.'
-      });
-    }
-
-    // For guest orders (no userId), anyone with the order ID can access it
-    // This is acceptable since order IDs are not predictable and are shared with users after checkout
 
     // If we have a Razorpay payment ID, fetch latest status
     let razorpayStatus = null;

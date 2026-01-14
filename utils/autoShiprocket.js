@@ -122,7 +122,7 @@ const createAutoShipment = async (orderId, orderType = 'regular') => {
       shippingEmail: email,
       shippingPhone: phone,
       orderItems: orderItems,
-      paymentMethod: order.payment?.status === 'paid' ? 'prepaid' : 'cod',
+      paymentMethod: order.payment?.method === 'cod' ? 'cod' : 'prepaid',
       subTotal: orderType === 'custom' ? order.price : order.total,
       length: 15, // Default dimensions
       breadth: 10,

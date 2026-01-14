@@ -45,7 +45,7 @@ async function checkOrders() {
     });
 
     // Count shipments
-    const withShipment = await Order.countDocuments({ 'deliveryOne.waybill': { $exists: true } });
+    const withShipment = await Order.countDocuments({ 'shiprocket.waybill': { $exists: true } });
     const totalOrders = await Order.countDocuments();
     
     console.log(`\nShipments: ${withShipment}/${totalOrders} orders have shipments created`);
