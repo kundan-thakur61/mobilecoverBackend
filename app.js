@@ -10,6 +10,10 @@ const { generalLimiter, authLimiter } = require('./middleware/rateLimiter');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
 
+// Initialize Sentry for error tracking (must be early)
+const { initSentry, sentryRequestHandler, sentryErrorHandler } = require('./utils/sentry');
+initSentry();
+
 const { resolveUploadsDir, defaultUploadsPath } = require('./utils/uploadsDir');
 
 const uploadsDir = resolveUploadsDir();
@@ -31,6 +35,11 @@ const collectionRoutes = require('./routes/collections');
 const shiprocketRoutes = require('./routes/shiprocket');
 
 const app = express();
+
+// Sentry request handler (must be first middleware)
+if (process.env.SENTRY_DSN) {
+  app.use(sentryRequestHandler);
+}
 
 // Short-circuit and log requests for missing/undefined upload paths (bots or bad clients)
 app.use((req, res, next) => {
@@ -197,6 +206,11 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development'
   });
 });
+
+// Sentry error handler (must be before other error handlers)
+if (process.env.SENTRY_DSN) {
+  app.use(sentryErrorHandler);
+}
 
 // Serve the built React app for any non-API route
 // With aggressive caching for hashed assets

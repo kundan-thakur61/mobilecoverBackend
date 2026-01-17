@@ -1,6 +1,10 @@
 const Product = require('../models/Product');
 const logger = require('../utils/logger');
 const { deleteImage } = require('../utils/cloudinary');
+const { paginatedQuery, findOneOptimized, clearCache } = require('../utils/queryOptimizer');
+
+const PRODUCTS_CACHE_TTL = 60 * 1000; // 1 minute cache for hot product queries
+const PUBLIC_PRODUCTS_CACHE_HEADER = 'public, max-age=60, stale-while-revalidate=300';
 
 // Helper to generate a reasonably-unique SKU
 const generateCandidateSku = () => {
@@ -71,40 +75,46 @@ const getProducts = async (req, res, next) => {
       query['variants.stock'] = { $gt: 0 };
     }
 
-    // Execute query with pagination
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
-    const skip = (pageNum - 1) * limitNum;
+    // Execute query with pagination (lean + cache)
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const cacheKey = `products:${Buffer.from(JSON.stringify({
+      query,
+      page: pageNum,
+      limit: limitNum,
+      sort
+    })).toString('base64')}`;
 
-    // Get total count for pagination
-    const totalCount = await Product.countDocuments(query);
-
-    // Get products
-    const products = await Product.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum)
-      .select('-mockupTemplatePublicId');
+    const { data: products, pagination } = await paginatedQuery(Product, query, {
+      page: pageNum,
+      limit: limitNum,
+      sort,
+      select: '-mockupTemplatePublicId',
+      lean: true,
+      cacheKey,
+      cacheTTL: PRODUCTS_CACHE_TTL,
+    });
 
     // Filter variants based on stock and active status
     const filteredProducts = products.map(product => {
-      const productObj = product.toObject();
-      productObj.variants = productObj.variants.filter(variant => 
+      const productObj = { ...product };
+      productObj.variants = productObj.variants.filter(variant =>
         variant.isActive && variant.stock > 0
       );
       return productObj;
     }).filter(product => product.variants.length > 0);
 
+    res.set('Cache-Control', PUBLIC_PRODUCTS_CACHE_HEADER);
     res.json({
       success: true,
       data: {
         products: filteredProducts,
         pagination: {
-          currentPage: pageNum,
-          totalPages: Math.ceil(totalCount / limitNum),
-          totalProducts: totalCount,
-          hasNext: pageNum < Math.ceil(totalCount / limitNum),
-          hasPrev: pageNum > 1
+          currentPage: pagination.page,
+          totalPages: pagination.pages,
+          totalProducts: pagination.total,
+          hasNext: pagination.hasNext,
+          hasPrev: pagination.hasPrev,
         }
       }
     });
@@ -119,8 +129,13 @@ const getProducts = async (req, res, next) => {
  */
 const getProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id)
-      .select('-mockupTemplatePublicId');
+    const cacheKey = `product:${req.params.id}`;
+    const product = await findOneOptimized(Product, { _id: req.params.id }, {
+      select: '-mockupTemplatePublicId',
+      lean: true,
+      cacheKey,
+      cacheTTL: PRODUCTS_CACHE_TTL,
+    });
     
     if (!product || !product.isActive) {
       return res.status(404).json({
@@ -130,8 +145,8 @@ const getProduct = async (req, res, next) => {
     }
 
     // Filter active variants with stock
-    const productObj = product.toObject();
-    productObj.variants = productObj.variants.filter(variant => 
+    const productObj = { ...product };
+    productObj.variants = productObj.variants.filter(variant =>
       variant.isActive && variant.stock > 0
     );
 
@@ -142,6 +157,7 @@ const getProduct = async (req, res, next) => {
       });
     }
 
+    res.set('Cache-Control', PUBLIC_PRODUCTS_CACHE_HEADER);
     res.json({
       success: true,
       data: { product: productObj }
@@ -203,6 +219,7 @@ const createProduct = async (req, res, next) => {
     });
 
     await product.save();
+    clearCache();
 
     logger.info('Product created:', { productId: product._id, title: product.title });
 
@@ -314,6 +331,7 @@ const updateProduct = async (req, res, next) => {
       }
 
       await product.save();
+      clearCache();
 
       logger.info('Product updated:', { productId: product._id, title: product.title });
 
@@ -356,6 +374,7 @@ const deleteProduct = async (req, res, next) => {
     }
 
     await Product.findByIdAndDelete(req.params.id);
+    clearCache();
 
     logger.info('Product deleted:', { productId: product._id, title: product.title });
 
@@ -410,6 +429,7 @@ const addVariant = async (req, res, next) => {
 
     product.variants.push(newVariant);
     await product.save();
+    clearCache();
 
     logger.info('Variant added:', { productId: product._id, sku: finalSku });
 
@@ -467,6 +487,7 @@ const updateVariant = async (req, res, next) => {
     if (isActive !== undefined) variant.isActive = isActive;
 
     await product.save();
+    clearCache();
 
     logger.info('Variant updated:', { productId: product._id, variantId: req.params.variantId });
 
@@ -513,6 +534,7 @@ const deleteVariant = async (req, res, next) => {
     // Remove variant in a safe way (avoid subdocument.remove() in certain Mongoose versions)
     product.variants = product.variants.filter(v => v._id.toString() !== req.params.variantId);
     await product.save();
+    clearCache();
 
     logger.info('Variant deleted:', { productId: product._id, variantId: req.params.variantId });
 

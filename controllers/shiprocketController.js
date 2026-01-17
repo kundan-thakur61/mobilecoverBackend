@@ -407,14 +407,11 @@ const createShipment = async (req, res, next) => {
  * GET /api/shiprocket/track/:identifier
  */
 const trackShipment = async (req, res, next) => {
-  console.log('🔥 DEBUG: trackShipment called with identifier:', req.params.identifier);
-  console.log('🔥 DEBUG: query params:', req.query);
-  
   try {
     const { identifier } = req.params;
     const { orderType = 'regular' } = req.query;
 
-    logger.info('📍 [Shiprocket] Tracking shipment:', { identifier });
+    logger.info('📍 [Shiprocket] Tracking shipment:', { identifier, orderType });
 
     let awbCode;
     let order;

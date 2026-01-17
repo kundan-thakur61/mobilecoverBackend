@@ -40,6 +40,8 @@ services:
         sync: false
       - key: SHIPROCKET_AUTO_CREATE
         value: true
+      - key: SENTRY_DSN
+        sync: false
       - key: FRONTEND_URL
         value: http://localhost:3000
       - key: CORS_ALLOWED_ORIGINS

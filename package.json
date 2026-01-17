@@ -24,6 +24,7 @@
   "author": "AI Assistant",
   "license": "MIT",
   "dependencies": {
+    "@sentry/node": "^10.34.0",
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.3",
