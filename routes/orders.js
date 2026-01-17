@@ -19,7 +19,8 @@ const {
   createPaymentOrder,
   getMyOrders,
   getOrder,
-  cancelOrder
+  cancelOrder,
+  trackOrder
 } = require('../controllers/orderController');
 
 // Validation rules
@@ -75,8 +76,12 @@ router.get('/my',
   getMyOrders
 );
 
-router.get('/:id', 
-  authMiddleware,
+router.get('/track',
+  trackOrder
+);
+
+router.get('/:id',
+  optionalAuth,
   getOrder
 );
 

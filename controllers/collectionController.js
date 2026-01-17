@@ -36,7 +36,7 @@ const cleanUrl = (u) => {
   if (typeof u !== 'string') return '';
   const v = u.trim();
   if (!v) return '';
-  // normalize obvious invalid uploads path
+  // normalize obvious invalid uploads path ky
   if (v === '/uploads/undefined' || v.endsWith('/undefined') || v.includes('/uploads/undefined')) return '';
   return v;
 };

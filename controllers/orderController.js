@@ -436,10 +436,17 @@ const getMyOrders = async (req, res, next) => {
  */
 const getOrder = async (req, res, next) => {
   try {
-    const order = await Order.findOne({
-      _id: req.params.id,
-      userId: req.user.id
-    }).populate('items.productId', 'title brand model type variants.images variants.color variants.price');
+    // Build query based on authentication status
+    const query = { _id: req.params.id };
+
+    // If user is authenticated, only allow access to their own orders
+    if (req.user) {
+      query.userId = req.user.id;
+    }
+    // If not authenticated, only allow access to guest orders (userId is null/undefined)
+
+    const order = await Order.findOne(query)
+      .populate('items.productId', 'title brand model type variants.images variants.color variants.price');
 
     if (!order) {
       return res.status(404).json({
@@ -637,6 +644,85 @@ const updateOrderStatus = async (req, res, next) => {
 
 
 
+const trackOrder = async (req, res, next) => {
+  try {
+    const { type, id } = req.query;
+
+    if (!type || !id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tracking type and ID are required'
+      });
+    }
+
+    let order;
+
+    switch (type) {
+      case 'orderId':
+        order = await Order.findById(id);
+        break;
+      
+      case 'awb':
+        order = await Order.findOne({
+          $or: [
+            { trackingNumber: id },
+            { 'deliveryOne.awbCode': id },
+            { 'deliveryOne.waybill': id }
+          ]
+        });
+        break;
+      
+      case 'shipmentId':
+        order = await Order.findOne({
+          $or: [
+            { 'deliveryOne.shipmentId': id },
+            { 'shiprocket.shipmentId': parseInt(id) }
+          ]
+        });
+        break;
+      
+      default:
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid tracking type. Use orderId, awb, or shipmentId'
+        });
+    }
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found with the provided tracking information'
+      });
+    }
+
+    res.json({
+      success: true,
+      order: {
+        _id: order._id,
+        items: order.items,
+        total: order.total,
+        status: order.status,
+        trackingNumber: order.trackingNumber || order.shiprocket?.awbCode || '',
+        shippingAddress: order.shippingAddress,
+        createdAt: order.createdAt,
+        shippedAt: order.shippedAt,
+        deliveredAt: order.deliveredAt,
+        estimatedDelivery: order.estimatedDelivery,
+        notes: order.notes,
+        deliveryOne: order.deliveryOne,
+        shiprocket: order.shiprocket,
+        payment: {
+          method: order.payment?.method,
+          status: order.payment?.status
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Track order error:', error);
+    next(error);
+  }
+};
+
 module.exports = {
   createOrder,
   verifyPayment,
@@ -646,5 +732,6 @@ module.exports = {
   cancelOrder,
   getAllOrders,
   updateOrderStatus,
-  getMyCustomOrders
+  getMyCustomOrders,
+  trackOrder
 };
