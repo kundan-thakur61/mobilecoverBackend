@@ -21,6 +21,7 @@ class ShiprocketService {
     this.password = process.env.SHIPROCKET_PASSWORD;
     this.token = null;
     this.tokenExpiry = null;
+    this.isTestEnv = process.env.NODE_ENV === 'test';
 
     // Log configuration on startup
     logger.info('🔧 Shiprocket Service Configuration:', {
@@ -295,7 +296,7 @@ class ShiprocketService {
         length = 17,
         breadth = 4,
         height = 2,
-        weight = 150 // Default 150 grams
+        weight = 0.15 // Default 0.15 kg
       } = orderData;
 
       // Prepare Shiprocket order payload
@@ -336,7 +337,7 @@ class ShiprocketService {
           tax: item.tax || 0,
           hsn: item.hsn || '999999'
         })),
-        payment_method: paymentMethod, // prepaid or cod
+        payment_method: paymentMethod === 'COD' ? 'COD' : 'Prepaid',
         shipping_charges: 0,
         giftwrap_charges: 0,
         transaction_charges: 0,
@@ -345,7 +346,7 @@ class ShiprocketService {
         length: length,
         breadth: breadth,
         height: height,
-        weight: Math.min(weight, 1000), // Use weight as-is (already in grams) and cap at 1000
+        weight: Math.min(Math.max(weight, 0.05), 30), // Shiprocket expects kg; bound to 0.05-30kg
         sub_total: subTotal
       };
 
@@ -567,19 +568,23 @@ class ShiprocketService {
           throw new Error('Invalid tracking response from Shiprocket API');
         }
       } catch (apiError) {
-        // Fallback to mock implementation on error
-        logger.info('🎭 Falling back to mock implementation due to API error:', apiError.message);
-        return this.mockRequest('GET', '/courier/track', { awb_code: awbCode }).data;
+        if (this.isTestEnv) {
+          logger.info('🎭 Falling back to mock implementation in test env due to API error:', apiError.message);
+          return this.mockRequest('GET', '/courier/track', { awb_code: awbCode }).data;
+        }
+        throw apiError;
       }
     } catch (error) {
       logger.error('❌ Failed to track shipment:', {
         awbCode,
         error: error.message
       });
-      
-      // Fallback to mock implementation on error
-      logger.info('🎭 Falling back to mock implementation due to API error');
-      return this.mockRequest('GET', '/courier/track', { awb_code: awbCode }).data;
+
+      if (this.isTestEnv) {
+        logger.info('🎭 Falling back to mock implementation in test env');
+        return this.mockRequest('GET', '/courier/track', { awb_code: awbCode }).data;
+      }
+      throw error;
     }
   }
 
@@ -600,7 +605,8 @@ class ShiprocketService {
 
       try {
         // For GET request, we need to send parameters as query string
-        const queryString = `?pickup_postcode=${pickupPin}&delivery_postcode=${deliveryPin}&cod=${codAmount > 0 ? 1 : 0}&weight=${weight * 1000}`;
+        const boundedWeight = Math.min(Math.max(weight || 0.5, 0.05), 30);
+        const queryString = `?pickup_postcode=${pickupPin}&delivery_postcode=${deliveryPin}&cod=${codAmount > 0 ? 1 : 0}&weight=${boundedWeight}`;
         const response = await this.request('GET', `/courier/serviceability${queryString}`);
 
         // Check if response has the expected data structure
@@ -619,19 +625,21 @@ class ShiprocketService {
           throw new Error('Invalid serviceability response from Shiprocket API');
         }
       } catch (apiError) {
-        // Fallback to mock implementation on error
-        logger.info('🎭 Falling back to mock implementation due to API error:', apiError.message);
-        const mockResult = this.mockRequest('GET', '/courier/serviceability', { 
-          pickup_postcode: pickupPin, 
-          delivery_postcode: deliveryPin 
-        });
-        
-        return {
-          success: true,
-          serviceable: true, // Default to serviceable in mock mode
-          data: mockResult.data,
-          isMock: true
-        };
+        if (this.isTestEnv) {
+          logger.info('🎭 Falling back to mock implementation in test env due to API error:', apiError.message);
+          const mockResult = this.mockRequest('GET', '/courier/serviceability', { 
+            pickup_postcode: pickupPin, 
+            delivery_postcode: deliveryPin 
+          });
+          
+          return {
+            success: true,
+            serviceable: true,
+            data: mockResult.data,
+            isMock: true
+          };
+        }
+        throw apiError;
       }
     } catch (error) {
       logger.error('❌ Serviceability check failed:', {
@@ -639,18 +647,20 @@ class ShiprocketService {
         delivery: deliveryPin,
         error: error.message
       });
-      
-      // Fallback to mock implementation on error
-      logger.info('🎭 Falling back to mock implementation for serviceability');
-      return {
-        success: true,
-        serviceable: true, // Default to serviceable in mock mode
-        data: this.mockRequest('GET', '/courier/serviceability', { 
-          pickup_postcode: pickupPin, 
-          delivery_postcode: deliveryPin 
-        }).data,
-        isMock: true
-      };
+
+      if (this.isTestEnv) {
+        logger.info('🎭 Falling back to mock implementation for serviceability in test env');
+        return {
+          success: true,
+          serviceable: true,
+          data: this.mockRequest('GET', '/courier/serviceability', { 
+            pickup_postcode: pickupPin, 
+            delivery_postcode: deliveryPin 
+          }).data,
+          isMock: true
+        };
+      }
+      throw error;
     }
   }
 
@@ -694,16 +704,20 @@ class ShiprocketService {
           throw new Error('Invalid pickup locations response from Shiprocket API');
         }
       } catch (apiError) {
-        // Fallback to mock implementation on error
-        logger.info('🎭 Falling back to mock implementation due to API error:', apiError.message);
-        return this.mockRequest('GET', '/settings/company/pickup-point/list').data;
+        if (this.isTestEnv) {
+          logger.info('🎭 Falling back to mock implementation in test env due to API error:', apiError.message);
+          return this.mockRequest('GET', '/settings/company/pickup-point/list').data;
+        }
+        throw apiError;
       }
     } catch (error) {
       logger.error('❌ Failed to get pickup locations:', error.message);
-      
-      // Fallback to mock implementation on error
-      logger.info('🎭 Falling back to mock implementation');
-      return this.mockRequest('GET', '/settings/company/pickup-point/list').data;
+
+      if (this.isTestEnv) {
+        logger.info('🎭 Falling back to mock implementation in test env');
+        return this.mockRequest('GET', '/settings/company/pickup-point/list').data;
+      }
+      throw error;
     }
   }
 
@@ -722,9 +736,11 @@ class ShiprocketService {
         logger.info('✅ Shipment cancelled:', { awbCode });
         return response;
       } catch (apiError) {
-        // Fallback to mock implementation on error
-        logger.info('🎭 Falling back to mock implementation due to API error:', apiError.message);
-        return this.mockCancelShipment(awbCode);
+        if (this.isTestEnv) {
+          logger.info('🎭 Falling back to mock implementation in test env due to API error:', apiError.message);
+          return this.mockCancelShipment(awbCode);
+        }
+        throw apiError;
       }
     } catch (error) {
       logger.error('❌ Failed to cancel shipment:', {
@@ -733,10 +749,12 @@ class ShiprocketService {
         status: error.response?.status,
         data: error.response?.data
       });
-      
-      // Fallback to mock implementation on error
-      logger.info('🎭 Falling back to mock implementation due to API error');
-      return this.mockCancelShipment(awbCode);
+
+      if (this.isTestEnv) {
+        logger.info('🎭 Falling back to mock implementation in test env');
+        return this.mockCancelShipment(awbCode);
+      }
+      throw error;
     }
   }
 
@@ -774,19 +792,23 @@ class ShiprocketService {
         logger.info('✅ Labels generated for shipments:', { shipmentIds });
         return response;
       } catch (apiError) {
-        // Fallback to mock implementation on error
-        logger.info('🎭 Falling back to mock implementation due to API error:', apiError.message);
-        return this.mockGenerateLabel(shipmentIds);
+        if (this.isTestEnv) {
+          logger.info('🎭 Falling back to mock implementation in test env due to API error:', apiError.message);
+          return this.mockGenerateLabel(shipmentIds);
+        }
+        throw apiError;
       }
     } catch (error) {
       logger.error('❌ Failed to generate labels:', {
         shipmentIds,
         error: error.message
       });
-      
-      // Fallback to mock implementation on error
-      logger.info('🎭 Falling back to mock implementation');
-      return this.mockGenerateLabel(shipmentIds);
+
+      if (this.isTestEnv) {
+        logger.info('🎭 Falling back to mock implementation in test env');
+        return this.mockGenerateLabel(shipmentIds);
+      }
+      throw error;
     }
   }
 
@@ -885,19 +907,23 @@ class ShiprocketService {
         logger.info('✅ Pickup requested for shipments:', { shipmentIds });
         return response;
       } catch (apiError) {
-        // Fallback to mock implementation on error
-        logger.info('🎭 Falling back to mock implementation due to API error:', apiError.message);
-        return this.mockRequestPickup(shipmentIds, pickupDate);
+        if (this.isTestEnv) {
+          logger.info('🎭 Falling back to mock implementation in test env due to API error:', apiError.message);
+          return this.mockRequestPickup(shipmentIds, pickupDate);
+        }
+        throw apiError;
       }
     } catch (error) {
       logger.error('❌ Failed to request pickup:', {
         shipmentIds,
         error: error.message
       });
-      
-      // Fallback to mock implementation on error
-      logger.info('🎭 Falling back to mock implementation');
-      return this.mockRequestPickup(shipmentIds, pickupDate);
+
+      if (this.isTestEnv) {
+        logger.info('🎭 Falling back to mock implementation in test env');
+        return this.mockRequestPickup(shipmentIds, pickupDate);
+      }
+      throw error;
     }
   }
 

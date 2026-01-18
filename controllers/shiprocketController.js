@@ -27,23 +27,17 @@ const createShipment = async (req, res, next) => {
     });
 
     const { orderId, orderType = 'regular', pickupLocationId, dimensions, weight: rawWeight } = req.body;
-    
-    // Convert weight properly for Shiprocket API
-    // Raw weight might be in kg or grams, and Shiprocket expects max 1000 grams
-    let weight = rawWeight || 0.15; // default to 0.15 kg if not provided
-    
-    // If the raw weight is very small (like 0.15), it's probably already in kg
-    // If it's larger (like 150), it might be in grams
-    // But we need to ensure it doesn't exceed Shiprocket's limit when converted
-    if (weight <= 1.0) {
-      // Likely in kg, convert to grams but cap at 1000
-      weight = Math.min(Math.round(weight * 1000), 1000);
-    } else if (weight > 1.0 && weight <= 1000) {
-      // Likely already in grams, keep as is but cap at 1000
-      weight = Math.min(Math.round(weight), 1000);
-    } else {
-      // If somehow higher than 1000, cap it
-      weight = 1000;
+
+    // Treat weight as kilograms; enforce sensible bounds (0.05kg - 30kg)
+    let weight = parseFloat(rawWeight || 0.15);
+    if (Number.isNaN(weight) || weight <= 0) {
+      weight = 0.15;
+    }
+    if (weight < 0.05) {
+      weight = 0.05;
+    }
+    if (weight > 30) {
+      weight = 30;
     }
     
     // Ensure pickupLocationId is a valid string or number
@@ -307,12 +301,12 @@ const createShipment = async (req, res, next) => {
       shippingEmail: email,
       shippingPhone: phone,
       orderItems: orderItems,
-      paymentMethod: order.payment?.status === 'paid' ? 'prepaid' : 'cod',
+      paymentMethod: order.payment?.status === 'paid' ? 'Prepaid' : 'COD',
       subTotal: orderType === 'custom' ? order.price : order.total,
       length: dimensions?.length || 17,
       breadth: dimensions?.breadth || 4,
       height: dimensions?.height || 2,
-      weight: weight // Weight already converted to grams for Shiprocket API
+      weight: weight // Weight in kilograms for Shiprocket API
     };
 
     logger.info('[Shiprocket] Using pickup location:', {
@@ -944,10 +938,13 @@ const getRecommendedCouriers = async (req, res, next) => {
       });
     }
 
+    const isPrepaid = order.payment?.status === 'paid';
+    const codAmount = isPrepaid ? 0 : (orderType === 'custom' ? order.price : order.total);
+
     const serviceabilityData = await shiprocketService.checkServiceability(
       pickupPin,
       deliveryPin,
-      orderType === 'custom' ? order.price : order.total,
+      codAmount,
       order.items?.reduce((total, item) => total + (item.weight || 0.5), 0) || 0.5 // Calculate total weight from items or use default
     );
 
