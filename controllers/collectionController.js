@@ -92,34 +92,7 @@ const findCollectionByIdentifier = async (identifier) => {
     }
   }
   
-  // If still not found, try some common fallback mappings
-  if (!collection) {
-    // Try mapping known aliases
-    const commonMappings = {
-      'anime-theme': 'custom-studio',
-      'custom-studio': 'anime-theme',
-      'krishna-theme': 'dreamy-pastels',
-      'dreamy-pastels': 'krishna-theme',
-      'marble-theme': 'gilded-marble',
-      'gilded-marble': 'marble-theme',
-      'cricketer-theme': 'quotes-club',
-      'quotes-club': 'cricketer-theme',
-      'cute-theme': 'midnight-bloom',
-      'midnight-bloom': 'cute-theme',
-      'aesthetic-theme': 'dreamy-pastels',
-      'aurora-pulse': 'dreamy-pastels',
-      'flower-theme': 'cosmic-doodles',
-      'cosmic-doodles': 'flower-theme',
-      'footballer-theme': 'footballer',
-      'footballer': 'footballer-theme',
-      'football-theme': 'footballer-theme',
-    };
-    
-    const mappedHandle = commonMappings[handle];
-    if (mappedHandle) {
-      collection = await Collection.findOne({ handle: mappedHandle });
-    }
-  }
+
 
   return collection;
 };
@@ -275,7 +248,8 @@ const deleteCollection = async (req, res, next) => {
     });
 
     await Promise.all(filesToRemove.map(async (publicId) => {
-      const filePath = path.join(uploadsDir, publicId);
+      const filename = publicId.includes('/') ? publicId.split('/').pop() : publicId;
+      const filePath = path.join(uploadsDir, filename);
       try {
         await fs.unlink(filePath);
       } catch (unlinkErr) {
@@ -377,7 +351,8 @@ const removeCollectionImage = async (req, res, next) => {
     await collection.save();
 
     if (publicId) {
-      const filePath = path.join(uploadsDir, publicId);
+      const filename = publicId.includes('/') ? publicId.split('/').pop() : publicId;
+      const filePath = path.join(uploadsDir, filename);
       try {
         await fs.unlink(filePath);
       } catch (unlinkErr) {
