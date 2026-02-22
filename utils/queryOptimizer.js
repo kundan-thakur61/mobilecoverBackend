@@ -11,9 +11,10 @@
 
 const logger = require('./logger');
 
-// Simple in-memory cache with TTL
+// Simple in-memory cache with TTL and max size to prevent memory leaks
 const cache = new Map();
-const CACHE_TTL = 60 * 1000; // 1 minute default
+const CACHE_TTL = 2 * 60 * 1000; // 2 minutes default (increased from 1 min)
+const MAX_CACHE_SIZE = 500; // Prevent unbounded memory growth
 
 /**
  * Get item from cache
@@ -39,6 +40,11 @@ const getFromCache = (key) => {
  * @param {number} ttl - Time to live in ms (default 1 min)
  */
 const setInCache = (key, value, ttl = CACHE_TTL) => {
+  // Evict oldest entries if cache is too large
+  if (cache.size >= MAX_CACHE_SIZE) {
+    const firstKey = cache.keys().next().value;
+    cache.delete(firstKey);
+  }
   cache.set(key, {
     value,
     expiry: Date.now() + ttl,

@@ -36,8 +36,21 @@ if (missingEnvs.length) {
 // Note: useNewUrlParser and useUnifiedTopology are deprecated in Mongoose 7+
 // These options are now default behavior and don't need to be specified
 if (process.env.NODE_ENV !== 'test') {
-  mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/mobile-cover-ecommerce')
-  .then(() => logger.info('Connected to MongoDB'))
+  mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://localhost:27017/mobile-cover-ecommerce', {
+    // Connection pool optimization for production
+    maxPoolSize: 10,
+    minPoolSize: 2,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    // Auto-create indexes in development, skip in production (use migration scripts)
+    autoIndex: process.env.NODE_ENV !== 'production',
+  })
+  .then(() => {
+    logger.info('Connected to MongoDB');
+    // Ensure database indexes in background (non-blocking)
+    const { ensureAllIndexes } = require('./scripts/ensureIndexes');
+    ensureAllIndexes().catch(err => logger.error('Index initialization error:', err));
+  })
   .catch(err => logger.error('MongoDB connection error:', err));
 } else {
   logger.info('Test environment detected: skipping automatic MongoDB connect');
@@ -87,7 +100,7 @@ if (process.env.NODE_ENV !== 'test') {
   });
 
   // Export io for use in controllers
-  module.exports.io = io;
+  app.io = io;
 } else {
   logger.info('Test environment detected: skipping app.listen');
 }

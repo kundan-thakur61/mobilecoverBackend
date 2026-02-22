@@ -1,3 +1,10 @@
+const Order = require('../models/Order');
+const Product = require('../models/Product');
+const { createOrder: createRazorpayOrder, verifyPaymentSignature } = require('../utils/razorpay');
+const logger = require('../utils/logger');
+const { paginatedQuery } = require('../utils/queryOptimizer');
+const { createAutoShipment } = require('../utils/autoShiprocket');
+
 /**
  * Get user's custom orders only
  * GET /api/orders/my-custom
@@ -41,14 +48,6 @@ const getMyCustomOrders = async (req, res, next) => {
     next(error);
   }
 };
-
-// ...existing code...
-const Order = require('../models/Order');
-const Product = require('../models/Product');
-const { createOrder: createRazorpayOrder, verifyPaymentSignature } = require('../utils/razorpay');
-const logger = require('../utils/logger');
-const { paginatedQuery } = require('../utils/queryOptimizer');
-const { createAutoShipment } = require('../utils/autoShiprocket');
 
 /**
  * Create a new order

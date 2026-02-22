@@ -174,7 +174,8 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['none', 'requested', 'processing', 'completed', 'failed'],
     default: 'none'
-  }
+  },
+  deliveredAt: Date
 }, {
   timestamps: true
 });

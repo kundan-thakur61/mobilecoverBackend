@@ -60,14 +60,22 @@ app.set('trust proxy', 1);
 // GZIP/Brotli compression for all responses - HUGE performance boost
 app.use(compression({
   level: 6, // Balanced compression level (1-9)
-  threshold: 1024, // Only compress responses > 1KB
+  threshold: 512, // Compress responses > 512 bytes (was 1KB)
   filter: (req, res) => {
     // Don't compress if client doesn't accept encoding
     if (req.headers['x-no-compression']) return false;
     // Compress all text-based responses
     return compression.filter(req, res);
-  }
+  },
+  // Prefer Brotli when available (better compression ratio)
+  // Express compression uses Accept-Encoding header automatically
 }));
+
+// Add Vary header for proper CDN/proxy caching
+app.use((req, res, next) => {
+  res.set('Vary', 'Accept-Encoding');
+  next();
+});
 
 // Serve static files for uploads (accessible via both /uploads and /api/uploads for dev proxying)
 // With aggressive caching for performance
@@ -82,6 +90,9 @@ const staticOptions = {
   etag: true,             // Enable ETags for validation
   lastModified: true,     // Include Last-Modified header
   immutable: true,        // Mark as immutable for CDN caching
+  setHeaders: (res) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+  },
 };
 
 uploadStaticDirs.forEach((dir) => {
@@ -147,15 +158,23 @@ app.use('/api', (req, res, next) => {
 app.use('/api/', generalLimiter);
 app.use('/api/auth/', authLimiter);
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Body parsing middleware - reduced limits to prevent abuse
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // Payment routes (must be after body parser)
 app.use('/api/payment', require('./routes/paymentRoutes'));
 
-// Logging middleware
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+// Logging middleware - skip health checks and static assets in production
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev', {
+  skip: (req) => {
+    // Skip logging for health checks and static assets in production
+    if (process.env.NODE_ENV === 'production') {
+      return req.url === '/api/health' || req.url.startsWith('/assets/');
+    }
+    return false;
+  },
+}));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -173,38 +192,20 @@ app.use('/api/shiprocket', shiprocketRoutes);
 
 
 
-// Root endpoint - API information
+// Root endpoint - API information (cached)
 app.get('/', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=3600');
   res.status(200).json({
     message: 'Mobile Cover E-commerce API',
     version: '1.0.0',
     status: 'running',
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/auth',
-      products: '/api/products',
-      orders: '/api/orders',
-      custom: '/api/custom',
-      customDesigns: '/api/custom-designs',
-      uploads: '/api/uploads',
-      wishlist: '/api/wishlist',
-      mobile: '/api/mobile',
-      collections: '/api/collections',
-      shiprocket: '/api/shiprocket',
-      admin: '/api/admin',
-      webhooks: '/api/webhooks'
-    },
-    documentation: 'See README.md for API documentation'
   });
 });
 
-// Health check endpoint
+// Health check endpoint (minimal payload, cached briefly)
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
+  res.set('Cache-Control', 'no-cache, max-age=0');
+  res.status(200).json({ status: 'OK' });
 });
 
 // Sentry error handler (must be before other error handlers)
