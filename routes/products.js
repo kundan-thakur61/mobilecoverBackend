@@ -22,11 +22,12 @@ const {
 const { authMiddleware, optionalAuth } = require('../middleware/authMiddleware');
 const { adminMiddleware } = require('../middleware/adminMiddleware');
 const validateRequest = require('../middleware/validateRequest');
+const { apiCache } = require('../middleware/apiCache');
 
-// Public routes
-router.get('/', getProducts);
-router.get('/:id', getProduct);
-router.get('/:id/reviews', optionalAuth, getProductReviews);
+// Public routes — cached to reduce TTFB
+router.get('/', apiCache(120), getProducts);
+router.get('/:id', apiCache(120), getProduct);
+router.get('/:id/reviews', optionalAuth, apiCache(60), getProductReviews);
 
 // Admin only routes
 router.post('/', 

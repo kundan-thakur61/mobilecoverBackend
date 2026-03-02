@@ -59,16 +59,13 @@ app.set('trust proxy', 1);
 
 // GZIP/Brotli compression for all responses - HUGE performance boost
 app.use(compression({
-  level: 6, // Balanced compression level (1-9)
-  threshold: 512, // Compress responses > 512 bytes (was 1KB)
+  level: 6,
+  threshold: 256, // Compress responses > 256 bytes (aggressive for mobile)
+  memLevel: 8, // Higher memory for better compression
   filter: (req, res) => {
-    // Don't compress if client doesn't accept encoding
     if (req.headers['x-no-compression']) return false;
-    // Compress all text-based responses
     return compression.filter(req, res);
   },
-  // Prefer Brotli when available (better compression ratio)
-  // Express compression uses Accept-Encoding header automatically
 }));
 
 // Add Vary header for proper CDN/proxy caching
